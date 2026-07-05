@@ -1,0 +1,58 @@
+name: commit-monitor
+
+# Always-on, laptop-independent fresh-commit security monitor.
+# Runs on GitHub's infrastructure every 6h. Uses the built-in workflow token
+# for API reads (no PAT stored as a secret). On findings it opens an Issue
+# (you get an email), and commits the updated baseline state back to the repo.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *" # every 6h, offset to :17 to dodge top-of-hour Actions congestion
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write # commit updated state.json/digests back
+  issues: write # open an issue when there are findings
+
+concurrency:
+  group: commit-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run monitor
+        id: run
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # built-in token; reads public repos fine
+        run: |
+          python3 bin/commit-monitor.py --min-score 5 > digest.md 2>&1 || true
+          echo "----- digest -----"
+          cat digest.md
+          # finding headers look like '## [7] ...' — only present when there are real leads
+          if grep -q '^## \[' digest.md; then echo "found=1" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Open issue on findings
+        if: steps.run.outputs.found == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "🔴 commit-monitor: new leads $(date -u +%F_%H%MZ)" \
+            --body-file digest.md
+
+      - name: Commit updated baseline state
+        run: |
+          git config user.name "commit-monitor"
+          git config user.email "commit-monitor@users.noreply.github.com"
+          git add -A commit-monitor/
+          git diff --cached --quiet || git commit -m "monitor: state update $(date -u +%FT%TZ)"
+          git push

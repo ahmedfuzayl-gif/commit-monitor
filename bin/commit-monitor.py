@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""
+commit-monitor: the source-code sibling of monitor.sh.
+
+Philosophy (same as this workspace): be FIRST to new attack surface. For source
+review that means reviewing NEW COMMITS the moment they land -- before the
+vendor's own security team and other hunters get to them. Stable, released code
+is already audited and duplicate-prone; the fresh delta is where an
+undiscovered, un-raced bug lives.
+
+What it does:
+  * Watches the in-scope repos in watchlist.json (per bounty program).
+  * On each run, fetches commits since the last-seen SHA (append-only state,
+    like monitor.sh's diffnew), and surfaces ONLY the new ones.
+  * Scores each commit for security relevance, tuned for BLOCKCHAIN INFRA /
+    node clients (consensus, p2p, crypto, tx/mempool, rpc, arithmetic, panics).
+  * Flags likely SECURITY-FIX commits as top priority -- these are
+    variant-analysis gold: when a vendor patches bug X here, the same pattern
+    often survives un-fixed in a sibling file. n-day -> 0-day.
+  * Emits a ranked markdown digest; you review only the delta, then go hunt.
+
+Usage:
+  commit-monitor.py                 # check all repos, surface new commits
+  commit-monitor.py --backfill 40   # first-run demo: score last N commits/repo
+  commit-monitor.py --repo cosmos/gaia --backfill 40   # one repo
+  commit-monitor.py --min-score 4   # only show commits at/above a score
+
+Auth: set GITHUB_TOKEN in the env for 5000 req/hr (vs 60 unauth). ~2 calls/repo.
+"""
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.request
+import urllib.error
+from datetime import datetime, timezone
+
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ~/bounty
+WATCHLIST = os.path.join(BASE, "watchlist.json")
+STATE_DIR = os.path.join(BASE, "commit-monitor")
+STATE = os.path.join(STATE_DIR, "state.json")
+DIGEST_DIR = os.path.join(STATE_DIR, "digests")
+API = "https://api.github.com"
+
+
+def _load_env():
+    # Auto-load GITHUB_TOKEN (etc.) from a gitignored, chmod-600 .env so the
+    # token never needs to appear on a command line or in the crontab.
+    for p in (os.path.join(STATE_DIR, ".env"), os.path.join(BASE, ".env")):
+        try:
+            with open(p) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip())
+        except FileNotFoundError:
+            pass
+
+
+_load_env()
+
+# ---- scoring, tuned for blockchain-infra / node-client bugs ----------------
+# Message words that flag a likely SECURITY FIX (highest value: variant-analysis
+# candidates). Weight 3 each.
+FIX_WORDS = [
+    "security", "vuln", "cve", "advisory", "exploit", "attack",
+    "panic", "overflow", "underflow", "oob", "out-of-bounds", "out of bounds",
+    "dos", "denial of service", "crash", "hang", "deadlock", "unsound",
+    "unbounded", "exhaust", "oom", "memory leak",
+    "malformed", "invalid", "reject", "sanitiz", "validate", "bounds check",
+    "unchecked", "double-spend", "double spend", "replay", "nonce reuse",
+    "consensus", "fork", "non-deterministic", "nondeterministic", "slashing",
+    "signature", "forge", "bypass", "auth", "underpriced", "griefing",
+]
+# Weaker generic "fix" signal. Weight 1.
+SOFT_FIX = ["fix", "bug", "incorrect", "wrong", "mishandl", "edge case", "regression"]
+
+# Security-relevant path fragments. Weight 2 each (capped).
+HOT_PATHS = [
+    "consensus", "crypto", "/sig", "signature", "/key", "p2p", "/net",
+    "rpc", "/api", "mempool", "txpool", "/tx", "/vm", "evm", "/state",
+    "validator", "stake", "slash", "/gov", "/bank", "ibc", "bridge",
+    "serde", "codec", "decode", "deserial", "rlp", "ssz", "borsh", "proto",
+    "verify", "/auth", "gas", "fee",
+]
+# Patch red-flag substrings (added lines). Weight 1 each (capped).
+CODE_FLAGS = [
+    ".unwrap(", ".expect(", "panic!(", "unreachable!(", "unsafe ",
+    "unchecked", "get_unchecked", "transmute", "from_raw", "as usize",
+    "as u64", "as u32", "as i64", "memcpy", "while true", "loop {",
+    "saturating_", "wrapping_", "overflowing_", ".clone()",
+    "recover(", "ecrecover", "assert(", "require(",
+]
+
+
+def gh_get(path, _tries=3):
+    url = path if path.startswith("http") else API + path
+    tok = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    last = None
+    for attempt in range(_tries):
+        req = urllib.request.Request(url, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "commit-monitor",
+        })
+        if tok:
+            req.add_header("Authorization", f"Bearer {tok}")
+        try:
+            with urllib.request.urlopen(req, timeout=45) as r:
+                return json.load(r), None
+        except urllib.error.HTTPError as e:
+            if e.code == 403 and "rate limit" in e.read().decode(errors="ignore").lower():
+                return None, "RATE_LIMIT"
+            return None, f"HTTP {e.code}"
+        except Exception as e:
+            # transient (IncompleteRead, timeout, reset): back off and retry
+            last = str(e)
+            time.sleep(1.5 * (attempt + 1))
+    return None, last
+
+
+def load_json(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return default
+
+
+def save_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(obj, f, indent=2)
+
+
+def score_commit(message, files):
+    """Return (score, reasons[]). files = list of {filename, patch?}."""
+    reasons = []
+    score = 0
+    msg = message.lower().split("\n")[0][:200]  # subject line
+
+    fix_hits = sorted({w for w in FIX_WORDS if w in msg})
+    if fix_hits:
+        score += 3 * min(len(fix_hits), 3)
+        reasons.append("FIX-signal msg: " + ", ".join(fix_hits[:5]))
+    soft_hits = sorted({w for w in SOFT_FIX if w in msg})
+    if soft_hits and not fix_hits:
+        score += 1
+        reasons.append("generic fix msg: " + ", ".join(soft_hits[:3]))
+
+    path_hits = sorted({p.strip("/") for f in files
+                        for p in HOT_PATHS if p in f.get("filename", "").lower()})
+    if path_hits:
+        score += min(2 * len(path_hits), 6)
+        reasons.append("hot paths: " + ", ".join(path_hits[:6]))
+
+    code_hits = set()
+    for f in files:
+        patch = f.get("patch", "") or ""
+        for line in patch.split("\n"):
+            if line.startswith("+") and not line.startswith("+++"):
+                for flag in CODE_FLAGS:
+                    if flag in line:
+                        code_hits.add(flag)
+    if code_hits:
+        score += min(len(code_hits), 5)
+        reasons.append("added-code flags: " + ", ".join(sorted(code_hits)[:6]))
+
+    return score, reasons
+
+
+def process_repo(entry, state, backfill, min_score):
+    repo = entry["repo"]
+    prog = entry.get("program", "?")
+    st = state.setdefault(repo, {})
+    last = st.get("last_sha")
+
+    commits, err = gh_get(f"/repos/{repo}/commits?per_page=100")
+    if err:
+        return [], err
+    if not commits:
+        return [], "no commits"
+    head = commits[0]["sha"]
+
+    # Determine the set of NEW commits to score.
+    if last is None and not backfill:
+        # First sight: baseline only, don't score history.
+        st["last_sha"] = head
+        st["default_branch_head_seen"] = datetime.now(timezone.utc).isoformat()
+        return [], "BASELINED (run again after new commits, or use --backfill)"
+
+    if last is None:
+        new = commits[:backfill]
+        compare_base = commits[min(backfill, len(commits)) - 1]["sha"] + "^" \
+            if len(commits) > backfill else None
+    else:
+        new = []
+        for c in commits:
+            if c["sha"] == last:
+                break
+            new.append(c)
+        compare_base = last
+
+    if not new:
+        st["last_sha"] = head
+        return [], "no new commits"
+
+    # Score PER-COMMIT (accurate) rather than on an aggregate diff. Merge
+    # commits (2+ parents) carry no changes of their own -- the real diff is in
+    # their child commits -- so skip them as noise. One detail call per
+    # non-merge commit; in normal operation there are only a handful of new
+    # commits per run. (--backfill N is the expensive outlier: up to N calls.)
+    findings = []
+    n_merges = 0
+    for c in new:
+        if len(c.get("parents", [])) > 1:
+            n_merges += 1
+            continue
+        msg = c["commit"]["message"]
+        detail, derr = gh_get(f"/repos/{repo}/commits/{c['sha']}")
+        files = detail.get("files", []) if (detail and not derr) else []
+        score, reasons = score_commit(msg, files)
+        if score >= min_score:
+            subj = msg.lower().split("\n")[0]
+            is_fix = any(w in subj for w in FIX_WORDS)
+            findings.append({
+                "repo": repo, "program": prog,
+                "sha": c["sha"][:10],
+                "url": f"https://github.com/{repo}/commit/{c['sha']}",
+                "date": c["commit"]["author"]["date"],
+                "author": c["commit"]["author"]["name"],
+                "subject": msg.split("\n")[0][:120],
+                "score": score, "reasons": reasons, "is_fix": is_fix,
+            })
+        time.sleep(0.15)
+
+    st["last_sha"] = head
+    note = f"scored {len(new) - n_merges} non-merge commit(s), skipped {n_merges} merge(s)"
+    return findings, note
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--backfill", type=int, default=0,
+                    help="score the last N commits per repo (first-run/demo)")
+    ap.add_argument("--repo", help="limit to one owner/name")
+    ap.add_argument("--min-score", type=int, default=3)
+    ap.add_argument("--no-save", action="store_true", help="don't update state")
+    args = ap.parse_args()
+
+    wl = load_json(WATCHLIST, None)
+    if wl is None:
+        print(f"!! no watchlist at {WATCHLIST}", file=sys.stderr)
+        sys.exit(1)
+    repos = wl["repos"] if isinstance(wl, dict) else wl
+    if args.repo:
+        repos = [r for r in repos if r["repo"] == args.repo]
+
+    state = load_json(STATE, {})
+    all_findings, notes = [], []
+    for entry in repos:
+        f, note = process_repo(entry, state, args.backfill, args.min_score)
+        all_findings.extend(f)
+        if note:
+            notes.append(f"  {entry['repo']}: {note}")
+        if note == "RATE_LIMIT":
+            print("!! GitHub rate limit hit -- set GITHUB_TOKEN and re-run.", file=sys.stderr)
+            break
+        time.sleep(0.3)
+
+    all_findings.sort(key=lambda x: -x["score"])
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M")
+    lines = [f"# commit-monitor digest {ts}", ""]
+    if all_findings:
+        lines.append(f"{len(all_findings)} security-relevant new commit(s), ranked:\n")
+        for x in all_findings:
+            if x.get("is_fix"):
+                tag = "🔴 SECURITY-FIX → variant-analysis (hunt the un-fixed siblings)"
+            elif x["score"] >= 6:
+                tag = "🟠 risky new code → review the new attack surface"
+            else:
+                tag = "🟡 review"
+            lines.append(f"## [{x['score']}] {tag} — {x['repo']} `{x['sha']}`")
+            lines.append(f"- **{x['subject']}**")
+            lines.append(f"- {x['program']} · {x['date']} · {x['author']}")
+            lines.append(f"- {x['url']}")
+            for r in x["reasons"]:
+                lines.append(f"  - {r}")
+            lines.append("")
+    else:
+        lines.append("No security-relevant new commits this run.\n")
+    if notes:
+        lines.append("## Notes")
+        lines.extend(notes)
+    digest = "\n".join(lines)
+    print(digest)
+
+    if all_findings:
+        os.makedirs(DIGEST_DIR, exist_ok=True)
+        dpath = os.path.join(DIGEST_DIR, f"digest-{ts}.md")
+        with open(dpath, "w") as f:
+            f.write(digest)
+        print(f"\n[saved: {dpath}]", file=sys.stderr)
+
+    if not args.no_save:
+        save_json(STATE, state)
+
+
+if __name__ == "__main__":
+    main()

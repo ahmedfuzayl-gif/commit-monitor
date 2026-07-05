@@ -1,0 +1,70 @@
+{
+  "cosmos/gaia": {
+    "last_sha": "df72c8e4ecf24f94ba3356b3c7e9fa1ae4578165",
+    "default_branch_head_seen": "2026-07-05T10:27:56.766186+00:00"
+  },
+  "cosmos/iavl": {
+    "last_sha": "0b9d3dab675013cef9ddc8a93ed7728caeccbae4",
+    "default_branch_head_seen": "2026-07-05T10:28:01.153419+00:00"
+  },
+  "cosmos/evm": {
+    "last_sha": "4ab7ba4e033caca10c5fe8fe91445f1fcf9ea347",
+    "default_branch_head_seen": "2026-07-05T10:28:10.269401+00:00"
+  },
+  "cosmos/ics23": {
+    "last_sha": "7f2c2d0965fdcf33658cce3198ddae078a449fc2",
+    "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
+  },
+  "Chia-Network/chia-blockchain": {
+    "last_sha": "318588a7e95da2faea37767e91076ddb29c9ca61",
+    "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
+  },
+  "Chia-Network/chia_rs": {
+    "last_sha": "ea43272041c13b740b9826577dc20d7f37b6f193",
+    "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
+  },
+  "Chia-Network/clvm_rs": {
+    "last_sha": "15bad6b0a829110e974a96beba912092e812774f",
+    "default_branch_head_seen": "2026-07-05T10:28:47.327190+00:00"
+  },
+  "Chia-Network/chiapos": {
+    "last_sha": "a388902bad5a287cbc6c90e153e4f6da2fa03c2f",
+    "default_branch_head_seen": "2026-07-05T10:28:53.048290+00:00"
+  },
+  "Chia-Network/chiavdf": {
+    "last_sha": "437050686792814692cd7e3ffe173097aab04a3b",
+    "default_branch_head_seen": "2026-07-05T10:28:57.678361+00:00"
+  },
+  "circlefin/malachite": {
+    "last_sha": "5cd137fb158fc52b55044eee9b090fd0d34996b0",
+    "default_branch_head_seen": "2026-07-05T13:17:59.397294+00:00"
+  },
+  "circlefin/arc-node": {
+    "last_sha": "bd4ab479dc78043ba367c11d4bf513d055315573",
+    "default_branch_head_seen": "2026-07-05T13:18:03.095988+00:00"
+  },
+  "circlefin/arc-remote-signer": {
+    "last_sha": "a9e9fdb48c1e96a6c3fb875aba3d341e6a8af1a6",
+    "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
+  },
+  "buildonspark/spark": {
+    "last_sha": "b7b6011da8dc4bfad323e2278ebf4a5b3dba7a63",
+    "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
+  },
+  "lightsparkdev/lightspark-rs": {
+    "last_sha": "fcb31f8580e9435e6114fac3ab56117aa3658556",
+    "default_branch_head_seen": "2026-07-05T13:18:14.049654+00:00"
+  },
+  "lightsparkdev/go-sdk": {
+    "last_sha": "c505517d0fb0174e7b174d5f643ec2387f0d67bf",
+    "default_branch_head_seen": "2026-07-05T13:18:18.666996+00:00"
+  },
+  "tronprotocol/java-tron": {
+    "last_sha": "381d369b43e78d29cf4bee87fc493aa3484afe46",
+    "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
+  },
+  "smartcontractkit/chainlink": {
+    "last_sha": "62ce4458a2394eceacfcaa60765fa0a855abd0fa",
+    "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
+  }
+}

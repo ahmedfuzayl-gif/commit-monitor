@@ -1,0 +1,4 @@
+.env
+commit-monitor/.env
+digest.md
+__pycache__/
