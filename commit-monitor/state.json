@@ -8,7 +8,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:01.153419+00:00"
   },
   "cosmos/evm": {
-    "last_sha": "877827da05eb10045cf1fc021f4d1b6ae562e36a",
+    "last_sha": "a739fe18f0854b137589e77aacf5c63da67527c8",
     "default_branch_head_seen": "2026-07-05T10:28:10.269401+00:00"
   },
   "cosmos/ics23": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "1125820a7e0b774d05daa42ce7434e44000e58b5",
+    "last_sha": "3cb87183add04c934e48a63aa555632f07bf0280",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
