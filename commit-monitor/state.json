@@ -16,11 +16,11 @@
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "ad54206f00e3e62233f6d007dec782465f55e95f",
+    "last_sha": "50ae1d0d30f95be10d90492f073f1c388cf06306",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
-    "last_sha": "ea43272041c13b740b9826577dc20d7f37b6f193",
+    "last_sha": "c2b167c7eec3e6b20be40bb42505294c687b4423",
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
   },
   "Chia-Network/clvm_rs": {
