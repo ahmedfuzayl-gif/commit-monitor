@@ -20,7 +20,7 @@
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
-    "last_sha": "c2b167c7eec3e6b20be40bb42505294c687b4423",
+    "last_sha": "2fd571599c55822769e3f7e30e27b78477d27f9e",
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
   },
   "Chia-Network/clvm_rs": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "89bea6a3e148a5c9bb4b2308ea2d2475e9be2bd3",
+    "last_sha": "7ef09e4f90dff86369711562ed5ff16178fd5dc4",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
