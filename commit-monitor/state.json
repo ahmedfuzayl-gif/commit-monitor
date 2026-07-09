@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "cf6c8e123a07b0b4caad9d8305939f4d31f9302e",
+    "last_sha": "89bea6a3e148a5c9bb4b2308ea2d2475e9be2bd3",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
