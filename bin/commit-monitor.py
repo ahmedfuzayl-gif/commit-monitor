@@ -30,6 +30,7 @@ Auth: set GITHUB_TOKEN in the env for 5000 req/hr (vs 60 unauth). ~2 calls/repo.
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -69,10 +70,12 @@ FIX_WORDS = [
     "panic", "overflow", "underflow", "oob", "out-of-bounds", "out of bounds",
     "dos", "denial of service", "crash", "hang", "deadlock", "unsound",
     "unbounded", "exhaust", "oom", "memory leak",
-    "malformed", "invalid", "reject", "sanitiz", "validate", "bounds check",
+    "malformed", "invalid", "reject", "sanitiz", "validat", "bounds check",
     "unchecked", "double-spend", "double spend", "replay", "nonce reuse",
     "consensus", "fork", "non-deterministic", "nondeterministic", "slashing",
-    "signature", "forge", "bypass", "auth", "underpriced", "griefing",
+    "signature", "forge", "bypass", "underpriced", "griefing",
+    "authoriz", "authentic", "unauthoriz", "authz", "spoof", "tamper",
+    "leak", "disclos", "traversal", "injection", "ssrf", "rce", "poison",
 ]
 # Weaker generic "fix" signal. Weight 1.
 SOFT_FIX = ["fix", "bug", "incorrect", "wrong", "mishandl", "edge case", "regression"]
@@ -90,9 +93,41 @@ CODE_FLAGS = [
     ".unwrap(", ".expect(", "panic!(", "unreachable!(", "unsafe ",
     "unchecked", "get_unchecked", "transmute", "from_raw", "as usize",
     "as u64", "as u32", "as i64", "memcpy", "while true", "loop {",
-    "saturating_", "wrapping_", "overflowing_", ".clone()",
+    "saturating_", "wrapping_", "overflowing_",
     "recover(", "ecrecover", "assert(", "require(",
 ]
+
+# Noise signals: commits that are almost never a security fix / new attack
+# surface. A subject starting with one of these prefixes, or containing one of
+# these words, gets a strong down-weight so cleanup/docs/dep churn stops
+# out-ranking real fixes.
+NEG_PREFIXES = (
+    "chore:", "chore(", "docs:", "docs(", "doc:", "test:", "test(", "tests:",
+    "ci:", "ci(", "build:", "build(", "style:", "perf:", "refactor:", "refactor(",
+    "bump ", "release", "changelog",
+)
+NEG_WORDS = [
+    "typo", "rename", "cleanup", "clean up", "readme", "changelog", "comment",
+    "formatting", "gofmt", "rustfmt", "lint", "dependabot", "version bump",
+    "remove impossible", "remove unused", "dead code", "whitespace", "spelling",
+    "bump version", "update deps", "upgrade dependency", "regenerate", "snapshot",
+]
+
+
+def _wordmatch(words, text):
+    """Left-boundary PREFIX match: the term must start a word, but may have a
+    suffix -- so 'vuln' matches 'vulnerability' and 'authoriz' matches
+    'authorization', while 'auth' no longer sneaks in via commit-metadata words
+    like 'author'/'authoritative' (we use the unambiguous 'authoriz'/'authentic'
+    stems instead). Multi-word / hyphenated phrases fall back to substring."""
+    hits = set()
+    for w in words:
+        if " " in w or "-" in w:
+            if w in text:
+                hits.add(w)
+        elif re.search(r"(?<![a-z0-9])" + re.escape(w), text):
+            hits.add(w)
+    return sorted(hits)
 
 
 def gh_get(path, _tries=3):
@@ -135,39 +170,82 @@ def save_json(path, obj):
 
 
 def score_commit(message, files):
-    """Return (score, reasons[]). files = list of {filename, patch?}."""
+    """Return (score, reasons[], is_secfix). files = list of {filename, patch?}.
+
+    Signal weighting (v2):
+      * A real FIX_WORD in the subject = a patched security bug -> variant-analysis
+        gold (hunt the un-fixed siblings). Highest weight; flags is_secfix.
+      * Risky NEW code (CODE_FLAGS on added lines) = fresh attack surface. Boosted,
+        since a new .unwrap()/panic!/get_unchecked in fund/consensus code is the most
+        direct "review this now" signal.
+      * HOT_PATHS is CONTEXT, not a standalone driver: it only adds points when there
+        is already a fix or risky-code signal (so a pure cleanup touching a
+        consensus/proto file no longer scores high on filename matches alone).
+      * Small, focused fixes get a bonus (a targeted security patch, not a big refactor).
+      * Cleanup/docs/test/dep-bump churn gets a strong penalty.
+    """
     reasons = []
     score = 0
-    msg = message.lower().split("\n")[0][:200]  # subject line
+    subj = message.lower().split("\n")[0][:200]
 
-    fix_hits = sorted({w for w in FIX_WORDS if w in msg})
-    if fix_hits:
-        score += 3 * min(len(fix_hits), 3)
-        reasons.append("FIX-signal msg: " + ", ".join(fix_hits[:5]))
-    soft_hits = sorted({w for w in SOFT_FIX if w in msg})
-    if soft_hits and not fix_hits:
-        score += 1
-        reasons.append("generic fix msg: " + ", ".join(soft_hits[:3]))
+    is_noise = subj.startswith(NEG_PREFIXES) or any(w in subj for w in NEG_WORDS)
 
-    path_hits = sorted({p.strip("/") for f in files
-                        for p in HOT_PATHS if p in f.get("filename", "").lower()})
-    if path_hits:
-        score += min(2 * len(path_hits), 6)
-        reasons.append("hot paths: " + ", ".join(path_hits[:6]))
+    fix_hits = _wordmatch(FIX_WORDS, subj)
+    soft_hits = _wordmatch(SOFT_FIX, subj)
 
-    code_hits = set()
+    def _is_noise_file(fn):
+        fn = fn.lower()
+        return bool(re.search(
+            r"(_test\.|\.test\.|\.spec\.|/tests?/|tests?\.rs$|/mocks?/|/fixtures?/|/testdata/"
+            r"|\.pb\.go$|_pb2\.py$|\.generated\.|/vendor/|/node_modules/"
+            r"|\.md$|\.txt$|\.lock$|\.snap$|/docs?/"
+            # generated FFI / wasm / SDK-binding artifacts (not hand-written surface)
+            r"|/wasm/|wasm-browser|wasm-nodejs|_bg\.wasm|\.wasm$|\.d\.ts$"
+            r"|uniffi|ffi\.|\.udl$|xcframework|/jnilibs/|\.framework/"
+            r"|_generated\.|/generated/|\.min\.js$)", fn))
+
+    code_hits, loc_added = set(), 0
     for f in files:
-        patch = f.get("patch", "") or ""
-        for line in patch.split("\n"):
+        if _is_noise_file(f.get("filename", "")):
+            continue  # tests/generated/docs are not new attack surface
+        for line in (f.get("patch", "") or "").split("\n"):
             if line.startswith("+") and not line.startswith("+++"):
+                loc_added += 1
                 for flag in CODE_FLAGS:
                     if flag in line:
                         code_hits.add(flag)
-    if code_hits:
-        score += min(len(code_hits), 5)
-        reasons.append("added-code flags: " + ", ".join(sorted(code_hits)[:6]))
+    path_hits = sorted({p.strip("/") for f in files
+                        if not _is_noise_file(f.get("filename", ""))
+                        for p in HOT_PATHS if p in f.get("filename", "").lower()})
 
-    return score, reasons
+    is_secfix = bool(fix_hits)
+
+    if fix_hits:
+        score += 4 + min(len(fix_hits), 2)   # 5-6: real fix-word in subject
+        reasons.append("FIX-signal: " + ", ".join(fix_hits[:5]))
+    elif soft_hits:
+        score += 1
+        reasons.append("generic-fix: " + ", ".join(soft_hits[:3]))
+
+    if code_hits:
+        score += min(2 * len(code_hits), 6)   # boosted: risky new code
+        reasons.append("risky-code: " + ", ".join(sorted(code_hits)[:6]))
+
+    if path_hits and (fix_hits or code_hits):
+        score += min(len(path_hits), 3)        # context bonus, only with a signal
+        reasons.append("hot-paths: " + ", ".join(path_hits[:6]))
+    elif path_hits:
+        reasons.append("(touches " + ", ".join(path_hits[:4]) + " but no fix/risky-code signal)")
+
+    if fix_hits and 0 < loc_added <= 40 and len(files) <= 4:
+        score += 2                              # small, focused fix = sharp variant target
+        reasons.append("small focused fix -> variant-analysis target")
+
+    if is_noise:
+        score = max(0, score - 4)
+        reasons.append("down-weighted: cleanup/docs/test/dep noise")
+
+    return score, reasons, is_secfix
 
 
 def process_repo(entry, state, backfill, min_score):
@@ -220,10 +298,8 @@ def process_repo(entry, state, backfill, min_score):
         msg = c["commit"]["message"]
         detail, derr = gh_get(f"/repos/{repo}/commits/{c['sha']}")
         files = detail.get("files", []) if (detail and not derr) else []
-        score, reasons = score_commit(msg, files)
+        score, reasons, is_fix = score_commit(msg, files)
         if score >= min_score:
-            subj = msg.lower().split("\n")[0]
-            is_fix = any(w in subj for w in FIX_WORDS)
             findings.append({
                 "repo": repo, "program": prog,
                 "sha": c["sha"][:10],
