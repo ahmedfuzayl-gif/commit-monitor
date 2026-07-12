@@ -66,5 +66,21 @@
   "smartcontractkit/chainlink": {
     "last_sha": "93cc5b5082755bc887ee2c4d4d77ffddc4cc9ef2",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
+  },
+  "lightsparkdev/python-sdk": {
+    "last_sha": "fdd626ea1195a84cae16f6f461ea07929c042482",
+    "default_branch_head_seen": "2026-07-12T12:01:57.917726+00:00"
+  },
+  "cosmos/ledger-cosmos": {
+    "last_sha": "486882045a33074405de3d5c9287fa7ed4cec265",
+    "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
+  },
+  "smartcontractkit/external-adapters-js": {
+    "last_sha": "fa193ead02f08285a79172d5c1a6d9c27995bb5a",
+    "default_branch_head_seen": "2026-07-12T12:02:00.599836+00:00"
+  },
+  "Chia-Network/chia-blockchain-gui": {
+    "last_sha": "6452bcb4fd0abcca4c87280455fa0cdb07669e95",
+    "default_branch_head_seen": "2026-07-12T12:02:02.027285+00:00"
   }
 }
