@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "90251e9732858813ea645094d0495c177ca686c5",
+    "last_sha": "713d2045bf5578b2483f3e81dbfb70145d67b72f",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "6773779edb0beb0ea238fa17110f8366c476f585",
+    "last_sha": "695ac0b71ecb8303e2ee2feb7fbd5df7f5a57fd6",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
