@@ -55,7 +55,10 @@ def _load_env():
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
                         k, v = line.split("=", 1)
-                        os.environ.setdefault(k.strip(), v.strip())
+                        v = v.strip()
+                        if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                            v = v[1:-1]  # strip matching surrounding quotes
+                        os.environ.setdefault(k.strip(), v)
         except FileNotFoundError:
             pass
 
@@ -83,6 +86,20 @@ FIX_WORDS = [
 ]
 # Weaker generic "fix" signal. Weight 1.
 SOFT_FIX = ["fix", "bug", "incorrect", "wrong", "mishandl", "edge case", "regression"]
+
+# High-confidence security terms — unambiguous enough to scan the commit BODY,
+# not just the subject. The softer domain nouns in FIX_WORDS ("validat" ->
+# "validator", "signature", "consensus", "fork", "reject", "invalid") over-fire
+# in long bodies, so they are deliberately EXCLUDED here to keep the 🔴 tier
+# precise while still recovering fixes described in the body under a terse subject.
+STRONG_FIX_WORDS = [
+    "security", "vuln", "cve", "advisory", "exploit", "attacker", "malicious",
+    "overflow", "underflow", "oob", "out-of-bounds", "out of bounds",
+    "panic", "crash", "unsound", "dos", "denial of service",
+    "bypass", "traversal", "injection", "ssrf", "rce", "xss", "csrf", "idor",
+    "ssti", "xxe", "deserial", "spoof", "forge", "poison", "smuggl",
+    "double-spend", "double spend", "replay", "unauthoriz", "privilege escalat",
+]
 
 # ---- per-target profiles ---------------------------------------------------
 # A watchlist entry selects one via "profile": "blockchain" | "web" | "generic".
@@ -191,6 +208,7 @@ def gh_get(path, _tries=3):
     for attempt in range(_tries):
         req = urllib.request.Request(url, headers={
             "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": "commit-monitor",
         })
         if tok:
@@ -199,7 +217,14 @@ def gh_get(path, _tries=3):
             with urllib.request.urlopen(req, timeout=45) as r:
                 return json.load(r), None
         except urllib.error.HTTPError as e:
-            if e.code == 403 and "rate limit" in e.read().decode(errors="ignore").lower():
+            body = e.read().decode(errors="ignore").lower()
+            rem = e.headers.get("X-RateLimit-Remaining")
+            # primary limit: 403 + remaining==0; secondary/abuse limit: 429, or
+            # 403 whose body says rate/abuse. Signal RATE_LIMIT so callers HOLD
+            # their watermark and retry next run instead of burying commits.
+            if (e.code in (403, 429) and
+                    (rem == "0" or "rate limit" in body or "abuse" in body
+                     or "secondary rate" in body)):
                 return None, "RATE_LIMIT"
             return None, f"HTTP {e.code}"
         except Exception as e:
@@ -215,12 +240,29 @@ def load_json(path, default):
             return json.load(f)
     except FileNotFoundError:
         return default
+    except (json.JSONDecodeError, ValueError):
+        # A half-written / corrupt state file must NOT crash the run or silently
+        # re-baseline every repo. Preserve it for inspection and warn loudly.
+        try:
+            os.replace(path, path + ".corrupt")
+            print(f"!! corrupt {os.path.basename(path)} -> .corrupt; using default",
+                  file=sys.stderr)
+        except OSError:
+            pass
+        return default
 
 
 def save_json(path, obj):
+    # Atomic write: dump to a temp file, fsync, then os.replace() (atomic on
+    # POSIX+Windows). A crash/full-disk mid-write can no longer truncate the
+    # crown-jewel state file to a half-written, unparseable blob.
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
+    tmp = f"{path}.tmp"
+    with open(tmp, "w") as f:
         json.dump(obj, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
 
 
 def score_commit(message, files, profile=None):
@@ -247,12 +289,19 @@ def score_commit(message, files, profile=None):
 
     reasons = []
     score = 0
-    subj = message.lower().split("\n")[0][:200]
+    full = message.lower()
+    subj = full.split("\n", 1)[0][:200]
+    body = full[len(subj):][:2000]  # first ~2k of the body, bounded
 
     is_noise = subj.startswith(NEG_PREFIXES) or any(w in subj for w in NEG_WORDS)
 
     fix_hits = _wordmatch(FIX_WORDS, subj)
     soft_hits = _wordmatch(SOFT_FIX, subj)
+    # The security signal often lives in the BODY under a terse subject
+    # ("Fixes CVE-...", "prevents a panic when..."). Scan it with the
+    # high-confidence subset only, and lift explicit CVE IDs as a strong signal.
+    body_fix = [w for w in _wordmatch(STRONG_FIX_WORDS, body) if w not in fix_hits]
+    cves = sorted(set(re.findall(r"cve-\d{4}-\d{4,7}", full)))
 
     def _is_noise_file(fn):
         fn = fn.lower()
@@ -284,14 +333,21 @@ def score_commit(message, files, profile=None):
                         if not _is_noise_file(f.get("filename", ""))
                         for p in hot_paths if p in f.get("filename", "").lower()})
 
-    is_secfix = bool(fix_hits)
+    is_secfix = bool(fix_hits) or bool(cves) or bool(body_fix)
 
     if fix_hits:
         score += 4 + min(len(fix_hits), 2)   # 5-6: real fix-word in subject
         reasons.append("FIX-signal: " + ", ".join(fix_hits[:5]))
+    elif body_fix:
+        score += 3 + min(len(body_fix), 2)   # 4-5: strong term in body, not subject
+        reasons.append("FIX-signal (body): " + ", ".join(body_fix[:5]))
     elif soft_hits:
         score += 1
         reasons.append("generic-fix: " + ", ".join(soft_hits[:3]))
+
+    if cves:
+        score += 3                            # explicit CVE reference: strong standalone
+        reasons.append("CVE referenced: " + ", ".join(cves[:4]))
 
     if code_hits:
         score += min(2 * len(code_hits), 6)   # boosted: risky new code
@@ -308,7 +364,7 @@ def score_commit(message, files, profile=None):
     elif path_hits:
         reasons.append("(touches " + ", ".join(path_hits[:4]) + " but no fix/risky-code signal)")
 
-    if fix_hits and 0 < loc_added <= 40 and len(files) <= 4:
+    if (fix_hits or body_fix) and 0 < loc_added <= 40 and len(files) <= 4:
         score += 2                              # small, focused fix = sharp variant target
         reasons.append("small focused fix -> variant-analysis target")
 
@@ -319,38 +375,61 @@ def score_commit(message, files, profile=None):
     return score, reasons, is_secfix
 
 
+def gh_commits_since(repo, last_sha, backfill, cap_pages=10):
+    """Walk /commits newest->oldest, PAGING until we reach last_sha (exclusive),
+    collect `backfill` commits when baselining, or run out of history.
+
+    Returns (new, head, status):
+      * status None       -> clean: the watermark boundary (or end of history,
+                             or the backfill count) was reached.
+      * status "INCOMPLETE"-> hit the page cap with the watermark still not found,
+                             i.e. more than cap_pages*100 commits landed since the
+                             last run. The older tail is UNSEEN -> caller must HOLD
+                             the watermark and surface it (don't silently bury it).
+      * any other string  -> hard error from gh_get ("RATE_LIMIT" / "HTTP ...").
+    """
+    new, head = [], None
+    baseline = last_sha is None
+    max_pages = 1 if (baseline and backfill) else cap_pages
+    for page in range(1, max_pages + 1):
+        batch, err = gh_get(f"/repos/{repo}/commits?per_page=100&page={page}")
+        if err:
+            return new, head, err
+        if not batch:
+            return new, head, None                 # ran off the end of history: clean
+        if head is None:
+            head = batch[0]["sha"]
+        for c in batch:
+            if not baseline and c["sha"] == last_sha:
+                return new, head, None             # boundary reached: clean
+            new.append(c)
+            if baseline and backfill and len(new) >= backfill:
+                return new, head, None
+    return new, head, "INCOMPLETE"
+
+
 def process_repo(entry, state, backfill, min_score):
     repo = entry["repo"]
     prog = entry.get("program", "?")
     st = state.setdefault(repo, {})
     last = st.get("last_sha")
 
-    commits, err = gh_get(f"/repos/{repo}/commits?per_page=100")
-    if err:
-        return [], err
-    if not commits:
-        return [], "no commits"
-    head = commits[0]["sha"]
-
-    # Determine the set of NEW commits to score.
+    # First sight with no --backfill: baseline to HEAD, don't score history.
     if last is None and not backfill:
-        # First sight: baseline only, don't score history.
-        st["last_sha"] = head
+        commits, err = gh_get(f"/repos/{repo}/commits?per_page=1")
+        if err:
+            return [], err
+        if not commits:
+            return [], "no commits"
+        st["last_sha"] = commits[0]["sha"]
         st["default_branch_head_seen"] = datetime.now(timezone.utc).isoformat()
         return [], "BASELINED (run again after new commits, or use --backfill)"
 
-    if last is None:
-        new = commits[:backfill]
-        compare_base = commits[min(backfill, len(commits)) - 1]["sha"] + "^" \
-            if len(commits) > backfill else None
-    else:
-        new = []
-        for c in commits:
-            if c["sha"] == last:
-                break
-            new.append(c)
-        compare_base = last
-
+    new, head, status = gh_commits_since(repo, last, backfill)
+    if status and status != "INCOMPLETE":
+        return [], status                          # RATE_LIMIT / HTTP: HOLD watermark
+    if head is None:
+        return [], "no commits"
     if not new:
         st["last_sha"] = head
         return [], "no new commits"
@@ -360,15 +439,27 @@ def process_repo(entry, state, backfill, min_score):
     # their child commits -- so skip them as noise. One detail call per
     # non-merge commit; in normal operation there are only a handful of new
     # commits per run. (--backfill N is the expensive outlier: up to N calls.)
+    #
+    # CRITICAL: the watermark advances ONLY on a fully-clean pass. If a page was
+    # missing (INCOMPLETE) or any per-commit detail fetch fails, we HOLD last_sha
+    # and re-scan next run (a harmless duplicate in the digest) rather than
+    # advance past a commit we never actually scored -- recall is the mission.
     findings = []
     n_merges = 0
+    incomplete = (status == "INCOMPLETE")
     for c in new:
         if len(c.get("parents", [])) > 1:
             n_merges += 1
             continue
         msg = c["commit"]["message"]
         detail, derr = gh_get(f"/repos/{repo}/commits/{c['sha']}")
-        files = detail.get("files", []) if (detail and not derr) else []
+        if derr == "RATE_LIMIT":
+            return findings, "RATE_LIMIT"          # bail; last_sha NOT advanced
+        if derr:
+            incomplete = True                      # transient/HTTP: degrade + retry
+            files = []
+        else:
+            files = detail.get("files", [])
         score, reasons, is_fix = score_commit(msg, files, entry.get("profile"))
         if score >= min_score:
             findings.append({
@@ -383,8 +474,15 @@ def process_repo(entry, state, backfill, min_score):
             })
         time.sleep(0.15)
 
-    st["last_sha"] = head
-    note = f"scored {len(new) - n_merges} non-merge commit(s), skipped {n_merges} merge(s)"
+    scored = len(new) - n_merges
+    if incomplete:
+        # Watermark HELD on purpose: surface loudly so it gets a manual --backfill.
+        reason = "gap >1000 commits since last run" if status == "INCOMPLETE" else "a detail fetch failed"
+        note = (f"PARTIAL ({scored} scored) — last_sha HELD for retry ({reason}); "
+                f"run: commit-monitor.py --repo {repo} --backfill 200")
+    else:
+        st["last_sha"] = head
+        note = f"scored {scored} non-merge commit(s), skipped {n_merges} merge(s)"
     return findings, note
 
 
@@ -419,11 +517,18 @@ def main():
         if note:
             notes.append(f"  {entry['repo']}: {note}")
         if note == "RATE_LIMIT":
-            print("!! GitHub rate limit hit -- set GITHUB_TOKEN and re-run.", file=sys.stderr)
+            print(f"!! GitHub rate limit hit on {entry['repo']} -- watermark HELD; "
+                  f"set GITHUB_TOKEN and re-run.", file=sys.stderr)
             break
+        if note.startswith("PARTIAL"):
+            # loud, per the no-silent-gaps rule: a commit was NOT scored this run
+            print(f"!! {entry['repo']}: {note}", file=sys.stderr)
         time.sleep(0.3)
 
-    all_findings.sort(key=lambda x: -x["score"])
+    # Rank: security-FIX commits first, then by score, then newest within a tie
+    # (two stable sorts: date desc, then the primary key).
+    all_findings.sort(key=lambda x: x.get("date", ""), reverse=True)
+    all_findings.sort(key=lambda x: (-int(bool(x.get("is_fix"))), -x["score"]))
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M")
     lines = [f"# commit-monitor digest {ts}", ""]
