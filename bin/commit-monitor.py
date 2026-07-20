@@ -76,26 +76,80 @@ FIX_WORDS = [
     "signature", "forge", "bypass", "underpriced", "griefing",
     "authoriz", "authentic", "unauthoriz", "authz", "spoof", "tamper",
     "leak", "disclos", "traversal", "injection", "ssrf", "rce", "poison",
+    # web app-sec fix vocabulary (used by the "web"/"generic" profiles)
+    "xss", "csrf", "idor", "sqli", "ssti", "xxe", "prototype pollution",
+    "open redirect", "privilege", "escalat", "smuggl", "path traversal",
+    "mass assignment", "insecure", "sandbox",
 ]
 # Weaker generic "fix" signal. Weight 1.
 SOFT_FIX = ["fix", "bug", "incorrect", "wrong", "mishandl", "edge case", "regression"]
 
-# Security-relevant path fragments. Weight 2 each (capped).
-HOT_PATHS = [
+# ---- per-target profiles ---------------------------------------------------
+# A watchlist entry selects one via "profile": "blockchain" | "web" | "generic".
+#   * paths  -> security-relevant path fragments (CONTEXT signal, weight 2 capped)
+#   * flags  -> red-flag substrings on ADDED lines (fresh attack surface)
+# "blockchain" is the historical default (node-client mem-safety / consensus).
+# "web" swaps in injection/authz/XSS sinks AND new-endpoint/route declarations,
+# so a feature commit that adds attack surface surfaces even with NO security
+# keyword in the subject -- the GitLab / web-app case. "generic" is the union,
+# for mixed or unclassified targets.
+_BLOCKCHAIN_PATHS = [
     "consensus", "crypto", "/sig", "signature", "/key", "p2p", "/net",
     "rpc", "/api", "mempool", "txpool", "/tx", "/vm", "evm", "/state",
     "validator", "stake", "slash", "/gov", "/bank", "ibc", "bridge",
     "serde", "codec", "decode", "deserial", "rlp", "ssz", "borsh", "proto",
     "verify", "/auth", "gas", "fee",
 ]
-# Patch red-flag substrings (added lines). Weight 1 each (capped).
-CODE_FLAGS = [
+_BLOCKCHAIN_FLAGS = [
     ".unwrap(", ".expect(", "panic!(", "unreachable!(", "unsafe ",
     "unchecked", "get_unchecked", "transmute", "from_raw", "as usize",
     "as u64", "as u32", "as i64", "memcpy", "while true", "loop {",
     "saturating_", "wrapping_", "overflowing_",
     "recover(", "ecrecover", "assert(", "require(",
 ]
+_WEB_PATHS = [
+    "controller", "/api", "route", "handler", "graphql", "resolver",
+    "/auth", "session", "/admin", "middleware", "policy", "policies",
+    "serializer", "webhook", "upload", "download", "template", "render",
+    "redirect", "oauth", "saml", "/sso", "jwt", "password", "login",
+    "account", "permission", "/acl", "csrf", "cors", "import", "export",
+    "proxy", "/url", "/file", "settings", "/models", "/views", "query",
+]
+_WEB_FLAGS = [
+    # command / code execution
+    "system(", "exec(", "eval(", "popen(", "subprocess", "child_process",
+    "os.system", "shell_exec", "proc_open", "Runtime.getRuntime",
+    "ProcessBuilder", "new Function(", "spawn(", "execSync(",
+    # sql
+    ".raw(", "find_by_sql", "createQueryBuilder", "sequelize.query",
+    "executeQuery(", "rawQuery(", "String.format", 'f"SELECT', 'f"select',
+    # deserialization
+    "pickle.loads", "yaml.load", "Marshal.load", "unserialize(",
+    "readObject", "ObjectInputStream",
+    # xss / html injection
+    "html_safe", "dangerouslySetInnerHTML", ".innerHTML", "v-html",
+    "mark_safe", "bypassSecurityTrust", "Markup(", "|safe",
+    # ssrf / file access
+    "send_file", "sendFile", "path.join(", "File.read", "readFileSync(",
+    "requests.get(", "urllib.request", "fetch(", "curl_exec",
+    # auth / authz weakening
+    "skip_before_action", "permit!", "verify=false", "verify: false",
+    "InsecureSkipVerify", "jwt.decode", "params.require",
+    # NEW route / endpoint surface (feature commits = new attack surface)
+    "resources :", "namespace :", "@app.route", "@router.", "Route::",
+    "@GetMapping", "@PostMapping", "@RequestMapping", "app.get(", "app.post(",
+    "router.get(", "router.post(", "addRoute", ".route(",
+]
+
+PROFILES = {
+    "blockchain": {"paths": _BLOCKCHAIN_PATHS, "flags": _BLOCKCHAIN_FLAGS},
+    "web": {"paths": _WEB_PATHS, "flags": _WEB_FLAGS},
+    "generic": {
+        "paths": sorted(set(_BLOCKCHAIN_PATHS) | set(_WEB_PATHS)),
+        "flags": sorted(set(_BLOCKCHAIN_FLAGS) | set(_WEB_FLAGS)),
+    },
+}
+DEFAULT_PROFILE = "blockchain"
 
 # Noise signals: commits that are almost never a security fix / new attack
 # surface. A subject starting with one of these prefixes, or containing one of
@@ -169,21 +223,28 @@ def save_json(path, obj):
         json.dump(obj, f, indent=2)
 
 
-def score_commit(message, files):
-    """Return (score, reasons[], is_secfix). files = list of {filename, patch?}.
+def score_commit(message, files, profile=None):
+    """Return (score, reasons[], is_secfix). files = list of {filename, patch?, status?}.
+    `profile` selects the paths/flags vocabulary (see PROFILES).
 
     Signal weighting (v2):
       * A real FIX_WORD in the subject = a patched security bug -> variant-analysis
         gold (hunt the un-fixed siblings). Highest weight; flags is_secfix.
-      * Risky NEW code (CODE_FLAGS on added lines) = fresh attack surface. Boosted,
-        since a new .unwrap()/panic!/get_unchecked in fund/consensus code is the most
-        direct "review this now" signal.
-      * HOT_PATHS is CONTEXT, not a standalone driver: it only adds points when there
+      * Risky NEW code (profile flags on added lines) = fresh attack surface. Boosted,
+        since a new .unwrap()/panic! (blockchain) or new endpoint/sink (web) is the
+        most direct "review this now" signal.
+      * A NEW FILE added under a hot path (web/generic profiles) = brand-new attack
+        surface even with no keyword -- catches feature commits, the GitLab case.
+      * Hot paths are CONTEXT, not a standalone driver: they only add points when there
         is already a fix or risky-code signal (so a pure cleanup touching a
         consensus/proto file no longer scores high on filename matches alone).
       * Small, focused fixes get a bonus (a targeted security patch, not a big refactor).
       * Cleanup/docs/test/dep-bump churn gets a strong penalty.
     """
+    prof_name = profile if profile in PROFILES else DEFAULT_PROFILE
+    hot_paths = PROFILES[prof_name]["paths"]
+    code_flags = PROFILES[prof_name]["flags"]
+
     reasons = []
     score = 0
     subj = message.lower().split("\n")[0][:200]
@@ -205,18 +266,23 @@ def score_commit(message, files):
             r"|_generated\.|/generated/|\.min\.js$)", fn))
 
     code_hits, loc_added = set(), 0
+    new_surface_files = []
     for f in files:
-        if _is_noise_file(f.get("filename", "")):
+        fn = f.get("filename", "")
+        if _is_noise_file(fn):
             continue  # tests/generated/docs are not new attack surface
+        low = fn.lower()
+        if f.get("status") == "added" and any(p in low for p in hot_paths):
+            new_surface_files.append(fn)  # brand-new file in a sensitive area
         for line in (f.get("patch", "") or "").split("\n"):
             if line.startswith("+") and not line.startswith("+++"):
                 loc_added += 1
-                for flag in CODE_FLAGS:
+                for flag in code_flags:
                     if flag in line:
                         code_hits.add(flag)
     path_hits = sorted({p.strip("/") for f in files
                         if not _is_noise_file(f.get("filename", ""))
-                        for p in HOT_PATHS if p in f.get("filename", "").lower()})
+                        for p in hot_paths if p in f.get("filename", "").lower()})
 
     is_secfix = bool(fix_hits)
 
@@ -231,7 +297,12 @@ def score_commit(message, files):
         score += min(2 * len(code_hits), 6)   # boosted: risky new code
         reasons.append("risky-code: " + ", ".join(sorted(code_hits)[:6]))
 
-    if path_hits and (fix_hits or code_hits):
+    if new_surface_files and prof_name in ("web", "generic"):
+        score += 2 + min(len(new_surface_files), 2)   # 3-4: new endpoint/handler file
+        reasons.append("NEW attack surface (added file in hot path): "
+                       + ", ".join(os.path.basename(p) for p in new_surface_files[:3]))
+
+    if path_hits and (fix_hits or code_hits or new_surface_files):
         score += min(len(path_hits), 3)        # context bonus, only with a signal
         reasons.append("hot-paths: " + ", ".join(path_hits[:6]))
     elif path_hits:
@@ -298,10 +369,11 @@ def process_repo(entry, state, backfill, min_score):
         msg = c["commit"]["message"]
         detail, derr = gh_get(f"/repos/{repo}/commits/{c['sha']}")
         files = detail.get("files", []) if (detail and not derr) else []
-        score, reasons, is_fix = score_commit(msg, files)
+        score, reasons, is_fix = score_commit(msg, files, entry.get("profile"))
         if score >= min_score:
             findings.append({
                 "repo": repo, "program": prog,
+                "profile": entry.get("profile") or DEFAULT_PROFILE,
                 "sha": c["sha"][:10],
                 "url": f"https://github.com/{repo}/commit/{c['sha']}",
                 "date": c["commit"]["author"]["date"],
@@ -333,6 +405,12 @@ def main():
     if args.repo:
         repos = [r for r in repos if r["repo"] == args.repo]
 
+    for r in repos:
+        p = r.get("profile")
+        if p and p not in PROFILES:
+            print(f"!! {r['repo']}: unknown profile {p!r}, falling back to "
+                  f"{DEFAULT_PROFILE!r} (valid: {', '.join(PROFILES)})", file=sys.stderr)
+
     state = load_json(STATE, {})
     all_findings, notes = [], []
     for entry in repos:
@@ -360,7 +438,7 @@ def main():
                 tag = "🟡 review"
             lines.append(f"## [{x['score']}] {tag} — {x['repo']} `{x['sha']}`")
             lines.append(f"- **{x['subject']}**")
-            lines.append(f"- {x['program']} · {x['date']} · {x['author']}")
+            lines.append(f"- {x['program']} · {x.get('profile', '?')} · {x['date']} · {x['author']}")
             lines.append(f"- {x['url']}")
             for r in x["reasons"]:
                 lines.append(f"  - {r}")

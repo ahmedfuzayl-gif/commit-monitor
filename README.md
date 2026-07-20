@@ -1,7 +1,9 @@
 # commit-monitor (always-on)
 
-Fresh-commit security monitor for bug-bounty **source review**, tuned for **blockchain
-infrastructure / node clients**. Runs 24/7 on GitHub Actions — laptop-independent.
+Fresh-commit security monitor for bug-bounty **source review**. Runs 24/7 on GitHub Actions —
+laptop-independent. Scoring is **profile-aware**: each watched repo is scored with the vocabulary
+that fits it — `blockchain` (node-client mem-safety / consensus), `web` (web-app injection/authz/
+XSS sinks **plus new endpoint/route declarations**), or `generic` (the union, for mixed targets).
 
 ## Why this exists
 The recurring killer in OSS source-review bounties is **duplicates**: stable, released code is
@@ -21,15 +23,20 @@ and surfaces only the security-relevant delta.
 ## Reading the output
 - **🔴 SECURITY-FIX → variant-analysis**: a vendor patched a bug here. Pull the diff and hunt the
   same pattern in sibling files they *didn't* fix. n-day → 0-day. Highest value.
-- **🟠 risky new code**: fresh attack surface (new panics/arithmetic/parsing in hot paths).
+- **🟠 risky new code**: fresh attack surface — new panics/arithmetic/parsing in hot paths
+  (`blockchain`), or a **new endpoint/controller/sink** (`web`). Note: the `web` profile flags
+  feature commits that add attack surface **even with no security keyword in the subject** — a
+  brand-new file under a hot path (`controller/`, `route`, `graphql`, …) scores on its own.
 - Discipline: **reachability-FIRST** — before building any PoC, prove attacker-controlled input
   reaches the sink AND a real trust boundary is crossed. (Hard-won lesson: a passing PoC can
   still be demonstrating intended behavior.)
 
 ## Watchlist
-`watchlist.json` — blockchain-infra repos verified **paid + source-code in-scope** (Cosmos, Chia,
-Circle, Lightspark, TRON, Chainlink). Add repos as you confirm scope on new programs; **verify a
-repo is still in-scope before reporting anything against it.**
+`watchlist.json` — repos verified **paid + source-code in-scope** (Cosmos, Chia, Circle,
+Lightspark, TRON, Chainlink). Each entry sets a **`profile`** (`blockchain` | `web` | `generic`)
+that picks its scoring vocabulary; unset defaults to `blockchain`. To watch a web app (e.g. a
+GitLab-class target), add it with `"profile": "web"`. Add repos as you confirm scope on new
+programs; **verify a repo is still in-scope before reporting anything against it.**
 
 ## Local use (optional)
 Also runnable locally: `python3 bin/commit-monitor.py [--backfill N] [--repo owner/name]

@@ -1,131 +1,153 @@
 {
-  "_comment": "Blockchain-infra / node-client repos that are PAID + source-code in-scope (verified against cached H1 scope data 2026-07-05). Skips smart-contract repos (stablecoin-*/cctp), mobile SDKs, and NO-BOUNTY entries. Each run scores only NEW commits since last-seen SHA. Verify each repo is still in-scope before reporting anything against it.",
+  "_comment": "PAID + source-code in-scope repos (verified against cached H1 scope data 2026-07-05). Skips smart-contract repos (stablecoin-*/cctp), mobile SDKs, and NO-BOUNTY entries. Each run scores only NEW commits since last-seen SHA. Verify each repo is still in-scope before reporting anything against it.",
+  "_profiles": "Each entry's \"profile\" selects the scoring vocabulary: 'blockchain' (node-client mem-safety / consensus, the default), 'web' (injection/authz/XSS sinks + NEW endpoint/route declarations, so feature commits surface as fresh attack surface even without a security keyword), or 'generic' (union of both, for mixed targets like Electron GUIs). Add web-app targets (e.g. a GitLab-class repo) with profile 'web'.",
   "repos": [
     {
       "repo": "cosmos/gaia",
       "program": "Cosmos (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Cosmos Hub node; critical"
     },
     {
       "repo": "cosmos/iavl",
       "program": "Cosmos (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Merkleized IAVL+ tree; state store"
     },
     {
       "repo": "cosmos/evm",
       "program": "Cosmos (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "EVM module; critical"
     },
     {
       "repo": "cosmos/ics23",
       "program": "Cosmos (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "proof spec; crypto/verify"
     },
     {
       "repo": "Chia-Network/chia-blockchain",
       "program": "Chia (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "full node (Python); consensus/p2p"
     },
     {
       "repo": "Chia-Network/chia_rs",
       "program": "Chia (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Rust consensus/crypto core"
     },
     {
       "repo": "Chia-Network/clvm_rs",
       "program": "Chia (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "CLVM VM in Rust; interpreter"
     },
     {
       "repo": "Chia-Network/chiapos",
       "program": "Chia (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "PoSpace C++; parsing/mem-safety"
     },
     {
       "repo": "Chia-Network/chiavdf",
       "program": "Chia (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "VDF C++; mem-safety"
     },
     {
       "repo": "circlefin/malachite",
       "program": "Circle BBP (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Rust BFT consensus engine; TOP consensus target"
     },
     {
       "repo": "circlefin/arc-node",
       "program": "Circle BBP (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Arc blockchain node"
     },
     {
       "repo": "circlefin/arc-remote-signer",
       "program": "Circle BBP (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "remote signer; key/crypto handling"
     },
     {
       "repo": "buildonspark/spark",
       "program": "Lightspark BBP (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Bitcoin/Lightning L2 infra"
     },
     {
       "repo": "lightsparkdev/lightspark-rs",
       "program": "Lightspark BBP (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Rust SDK/infra"
     },
     {
       "repo": "lightsparkdev/go-sdk",
       "program": "Lightspark BBP (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Go SDK/infra"
     },
     {
       "repo": "tronprotocol/java-tron",
       "program": "TRON DAO (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "TRON full node (Java); consensus/p2p/vm"
     },
     {
       "repo": "smartcontractkit/chainlink",
       "program": "Chainlink (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "oracle node (Go); NOTE resp_eff only ~46%"
     },
     {
       "repo": "lightsparkdev/python-sdk",
       "program": "Lightspark BBP (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Python SDK/infra"
     },
     {
       "repo": "cosmos/ledger-cosmos",
       "program": "Cosmos (H1)",
       "platform": "hackerone",
+      "profile": "blockchain",
       "notes": "Ledger hardware-wallet app (C); parsing/mem-safety/crypto"
     },
     {
       "repo": "smartcontractkit/external-adapters-js",
       "program": "Chainlink (H1)",
       "platform": "hackerone",
+      "profile": "web",
       "notes": "Node.js external adapters; SSRF/injection/auth (web-app surface)"
     },
     {
       "repo": "Chia-Network/chia-blockchain-gui",
       "program": "Chia (H1)",
       "platform": "hackerone",
-      "notes": "Electron GUI; desktop-app bug class"
+      "profile": "generic",
+      "notes": "Electron GUI (React/TS); desktop-app + web renderer bug classes"
     }
   ]
 }
