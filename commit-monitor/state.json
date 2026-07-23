@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "29003c544c43e3daca00f5b835cb717558c3d4f3",
+    "last_sha": "6622181585578108c9acc67d81b80f7ab25b1d61",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
@@ -64,11 +64,11 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "bcb2165db29fd48deeef9ad6febeea6aa995eeb5",
+    "last_sha": "e41c661f2a5de86946f0b3680a01049caa4b13de",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
-    "last_sha": "fdd626ea1195a84cae16f6f461ea07929c042482",
+    "last_sha": "26e11578308a8a57e5eb5e46b88c2a458f7cccd0",
     "default_branch_head_seen": "2026-07-12T12:01:57.917726+00:00"
   },
   "cosmos/ledger-cosmos": {
