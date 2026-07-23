@@ -40,7 +40,7 @@
     "default_branch_head_seen": "2026-07-05T13:17:59.397294+00:00"
   },
   "circlefin/arc-node": {
-    "last_sha": "c9db7325f4f8de7701e7ab8033c82a33e078b2f4",
+    "last_sha": "3fd9546170667650e09d7e0e9ddbb4aee05f12d8",
     "default_branch_head_seen": "2026-07-05T13:18:03.095988+00:00"
   },
   "circlefin/arc-remote-signer": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "e41c661f2a5de86946f0b3680a01049caa4b13de",
+    "last_sha": "19bc7447bbe1d7d686d37d532927c458adb8ca2f",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
@@ -76,7 +76,7 @@
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
-    "last_sha": "d945df8f8977d18274ae39e9a76ccce77725ac61",
+    "last_sha": "122d264b0c1308d4696dd74565feb300b689270b",
     "default_branch_head_seen": "2026-07-12T12:02:00.599836+00:00"
   },
   "Chia-Network/chia-blockchain-gui": {
