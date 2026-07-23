@@ -40,7 +40,7 @@
     "default_branch_head_seen": "2026-07-05T13:17:59.397294+00:00"
   },
   "circlefin/arc-node": {
-    "last_sha": "3fd9546170667650e09d7e0e9ddbb4aee05f12d8",
+    "last_sha": "4657adec9b9424717e10166b6eeb73f594f20ba4",
     "default_branch_head_seen": "2026-07-05T13:18:03.095988+00:00"
   },
   "circlefin/arc-remote-signer": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "6622181585578108c9acc67d81b80f7ab25b1d61",
+    "last_sha": "ac84f830d863783b309f775ad8206c842c1e1224",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "19bc7447bbe1d7d686d37d532927c458adb8ca2f",
+    "last_sha": "61ae257cd763bc16807a70c8fd2cff79c330071c",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
@@ -76,7 +76,7 @@
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
-    "last_sha": "122d264b0c1308d4696dd74565feb300b689270b",
+    "last_sha": "38e487e2e7715f3bf5c6e2d3b633015a2cbdf26b",
     "default_branch_head_seen": "2026-07-12T12:02:00.599836+00:00"
   },
   "Chia-Network/chia-blockchain-gui": {
