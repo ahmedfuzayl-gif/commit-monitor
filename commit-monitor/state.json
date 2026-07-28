@@ -16,7 +16,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "6f00ac69d7474becc2788d7a64c96f199c57ca13",
+    "last_sha": "2cee412445fb6ba3a8e7bc7d3de2f4826a6e6c59",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "330cd672161efd50583df183a1ceaa3aadbece52",
+    "last_sha": "f1f6ad6f195d8c7141202828171026b963166e43",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
