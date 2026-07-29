@@ -16,7 +16,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "29e23ff7a777d29eec43242503a46d0a41050e67",
+    "last_sha": "40e76f17066d77426a75566d0a65f8777ce5a693",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "9f65859dba91b912652644f0fe008cef281073fb",
+    "last_sha": "2ab54efc0fd36af09def92fba496f3deab0bcf1f",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
