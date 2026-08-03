@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "209c362c92897390c95cfb0e37480bf5449bc980",
+    "last_sha": "055bba6c79f0308985fe02a4144d760b96df8b5a",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
@@ -72,7 +72,7 @@
     "default_branch_head_seen": "2026-07-12T12:01:57.917726+00:00"
   },
   "cosmos/ledger-cosmos": {
-    "last_sha": "a89a7abc4218a90bd76a7094d20f5a8450d8bfd3",
+    "last_sha": "f75a9ea2065b2a5aaed80bf54fcfe123ad748c10",
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
