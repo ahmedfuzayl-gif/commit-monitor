@@ -8,7 +8,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:01.153419+00:00"
   },
   "cosmos/evm": {
-    "last_sha": "0b0cf1d7b72e376b2180ac752d9f8c56bf1e3039",
+    "last_sha": "0ae5e223210ffc706fbc90b6a22be211a5c0e816",
     "default_branch_head_seen": "2026-07-05T10:28:10.269401+00:00"
   },
   "cosmos/ics23": {
@@ -16,11 +16,11 @@
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "545b3e476f60be0864214dd527f93dcb3d52decf",
+    "last_sha": "d1d9a2b40b29cca03eae9e37d5e05dfe3f4a8a55",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
-    "last_sha": "8d1fa1dc1b037e6a812c5080db2c8d30b1cf2d77",
+    "last_sha": "0d3166e588da575fae9247e9176273878e4e5e86",
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
   },
   "Chia-Network/clvm_rs": {
@@ -32,7 +32,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:53.048290+00:00"
   },
   "Chia-Network/chiavdf": {
-    "last_sha": "f7f4d07af9f54e71cf312b1f71bd44ed8e046934",
+    "last_sha": "55f5f16ecf987870ed8ed8a930d744fa20716aa8",
     "default_branch_head_seen": "2026-07-05T10:28:57.678361+00:00"
   },
   "circlefin/malachite": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "71f388be0be616704b6a258a7bd9deea64850e66",
+    "last_sha": "d2f97d2cd6c5fcca678123f954b499049850b6bd",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
