@@ -16,7 +16,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "fec92d5b2b25365b48374da4a3cf3520dc7af60f",
+    "last_sha": "67cdfcda4159328296936ebfb29804548bd1dcd6",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
@@ -32,7 +32,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:53.048290+00:00"
   },
   "Chia-Network/chiavdf": {
-    "last_sha": "55f5f16ecf987870ed8ed8a930d744fa20716aa8",
+    "last_sha": "8cbbacd9db3c034983294e7356ee9064109ea4ce",
     "default_branch_head_seen": "2026-07-05T10:28:57.678361+00:00"
   },
   "circlefin/malachite": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "532fb0e42f68c6fa977449893a48a9060b2c26e9",
+    "last_sha": "354d094842ec560e3829f060ca29bd5aa71a7894",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
