@@ -1,6 +1,6 @@
 {
   "cosmos/gaia": {
-    "last_sha": "7b88c409521f119eaa06e58488b4adcef51fd318",
+    "last_sha": "9b2328bf68c17dd922d4572a6622dbd43f7a0672",
     "default_branch_head_seen": "2026-07-05T10:27:56.766186+00:00"
   },
   "cosmos/iavl": {
@@ -16,7 +16,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "e146480c64b7b919dd182e9e0ffa3fbe22d3e658",
+    "last_sha": "efc13fa8caf1e6fa377a6e1568e92f0f3d793cd9",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "e6458dee6fdc792c5fe4a0f607c415926615548e",
+    "last_sha": "af1ec3067d4d38ad08cd0406dd79d2164440c9a4",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "673d7e955a6889467118ee216020ef726ebdefaa",
+    "last_sha": "2be6da4ade493945a337302ddab07eacf11e6732",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
@@ -76,7 +76,7 @@
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
-    "last_sha": "23d9f2c84d3a93b693c3a9321f294b4fa33d9da7",
+    "last_sha": "8680ae23e108decd270ccb1168a0f34f5d999440",
     "default_branch_head_seen": "2026-07-12T12:02:00.599836+00:00"
   },
   "Chia-Network/chia-blockchain-gui": {
