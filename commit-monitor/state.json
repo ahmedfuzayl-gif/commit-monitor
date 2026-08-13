@@ -1,6 +1,6 @@
 {
   "cosmos/gaia": {
-    "last_sha": "9b2328bf68c17dd922d4572a6622dbd43f7a0672",
+    "last_sha": "2ec115862c8226a8f4f49934e9e1c40984730861",
     "default_branch_head_seen": "2026-07-05T10:27:56.766186+00:00"
   },
   "cosmos/iavl": {
@@ -16,7 +16,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "76e89d94d9d7e5a200ee26b2193ebb14c9f53e95",
+    "last_sha": "d462449dc99902bee725e070c26cd2d36335919a",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
@@ -24,7 +24,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
   },
   "Chia-Network/clvm_rs": {
-    "last_sha": "8ac1c93df912a5abe28c0bf681d11483dd255a13",
+    "last_sha": "bbcdbc233deee104717d47f45a296c74824142c5",
     "default_branch_head_seen": "2026-07-05T10:28:47.327190+00:00"
   },
   "Chia-Network/chiapos": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "724707eaffb3da5c090a6d938377f180f36866a8",
+    "last_sha": "e913240dda6f43fac89ad654a5bdb9cc1f459efd",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "49cbdb6b4da540dd03bbd17aeba518b3ddc6b323",
+    "last_sha": "35c9b3c074fb55ce97bb3e5920feca8d39160ecf",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
@@ -76,7 +76,7 @@
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
-    "last_sha": "ec2726bea00035677df6f252c37a4df4c8894cab",
+    "last_sha": "02523187439433889900641bd1b839c1d9cab2fe",
     "default_branch_head_seen": "2026-07-12T12:02:00.599836+00:00"
   },
   "Chia-Network/chia-blockchain-gui": {
