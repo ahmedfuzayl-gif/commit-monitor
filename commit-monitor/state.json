@@ -24,7 +24,7 @@
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
   },
   "Chia-Network/clvm_rs": {
-    "last_sha": "bbcdbc233deee104717d47f45a296c74824142c5",
+    "last_sha": "05c7896937946efdd0f0d950a2d5ac22182814f3",
     "default_branch_head_seen": "2026-07-05T10:28:47.327190+00:00"
   },
   "Chia-Network/chiapos": {
@@ -76,7 +76,7 @@
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
-    "last_sha": "950ba47fba7af671f008a7da1ba033e361ac2ae5",
+    "last_sha": "b4bbbca13ae41f7a26fc4e1e1b0b122b05f014dc",
     "default_branch_head_seen": "2026-07-12T12:02:00.599836+00:00"
   },
   "Chia-Network/chia-blockchain-gui": {
