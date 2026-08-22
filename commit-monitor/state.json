@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "b3db73e6c30cf0a367802f3d9aefba84eaf96554",
+    "last_sha": "f2f51dfabcb60188fd4809304d085dcff9e938e0",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
