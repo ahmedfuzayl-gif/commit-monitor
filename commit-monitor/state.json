@@ -20,7 +20,7 @@
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
-    "last_sha": "7fe9a89246b49a383256c920b50a38ee78d0390a",
+    "last_sha": "6be38c70b78991c511ec9077e295ddecae157ef1",
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
   },
   "Chia-Network/clvm_rs": {
@@ -48,7 +48,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:05.243002+00:00"
   },
   "buildonspark/spark": {
-    "last_sha": "3c91317a598a9d33f3753448e422fce568aefdc2",
+    "last_sha": "99fb7be3bd7f49580e4c9170c9ea077e869e5d83",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00"
   },
   "lightsparkdev/lightspark-rs": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "2c82aa09cf21fa6d169fcbd473ad56fa6c74a7a1",
+    "last_sha": "b3db73e6c30cf0a367802f3d9aefba84eaf96554",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
