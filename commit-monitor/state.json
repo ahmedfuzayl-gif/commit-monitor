@@ -20,7 +20,7 @@
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00"
   },
   "Chia-Network/chia_rs": {
-    "last_sha": "6be38c70b78991c511ec9077e295ddecae157ef1",
+    "last_sha": "e11b3c8aa97af8f5d0915d72d4ac7b3c3da00cc2",
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00"
   },
   "Chia-Network/clvm_rs": {
@@ -64,7 +64,7 @@
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "3ab2ed26851a7e9b68b35d6551c9e914ecb8c2ae",
+    "last_sha": "5237cbc46a190d70b5c084534ddee8f6439031fe",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00"
   },
   "lightsparkdev/python-sdk": {
@@ -72,7 +72,7 @@
     "default_branch_head_seen": "2026-07-12T12:01:57.917726+00:00"
   },
   "cosmos/ledger-cosmos": {
-    "last_sha": "af603aa39b3e7c02371fe142866c80d3faa4fe13",
+    "last_sha": "074dea2ce78fb11711bf32ca492b9d5b7f025ba4",
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
