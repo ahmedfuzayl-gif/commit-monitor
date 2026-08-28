@@ -40,7 +40,7 @@
     "default_branch_head_seen": "2026-07-05T13:17:59.397294+00:00"
   },
   "circlefin/arc-node": {
-    "last_sha": "90d71dcb6e38c485b7f057fc42f45bff7bbc248f",
+    "last_sha": "66ad2d5aa6d9b41e8f689812004be4c7233a9e16",
     "default_branch_head_seen": "2026-07-05T13:18:03.095988+00:00"
   },
   "circlefin/arc-remote-signer": {
