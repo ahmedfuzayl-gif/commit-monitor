@@ -236,6 +236,21 @@ class RepositoryProcessingTests(unittest.TestCase):
         self.assertEqual("app/controllers/new_controller.rb", files[0]["filename"])
 
 
+class DigestTests(unittest.TestCase):
+    def test_issue_body_is_bounded_and_links_complete_digest(self):
+        run_url = "https://github.com/owner/repo/actions/runs/123"
+        body = monitor.bounded_issue_body("x" * 1_000, run_url, limit=300)
+
+        self.assertLessEqual(len(body), 300)
+        self.assertIn("Digest truncated", body)
+        self.assertIn(run_url, body)
+
+    def test_short_issue_body_is_unchanged(self):
+        digest = "# digest\n\nNo findings."
+
+        self.assertEqual(digest, monitor.bounded_issue_body(digest))
+
+
 class ConfigurationTests(unittest.TestCase):
     def test_invalid_and_duplicate_targets_are_rejected(self):
         errors = monitor.validate_repos([

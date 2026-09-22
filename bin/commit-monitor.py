@@ -47,6 +47,7 @@ GITHUB_API = "https://api.github.com"
 GITLAB_API = "https://gitlab.com/api/v4"
 PROVIDERS = ("github", "gitlab")
 REWARD_TYPES = ("bounty", "vdp")
+ISSUE_BODY_LIMIT = 60_000
 
 
 def _load_env():
@@ -301,6 +302,21 @@ def save_json(path, obj):
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+
+
+def bounded_issue_body(digest, run_url="", limit=ISSUE_BODY_LIMIT):
+    """Keep alerts below GitHub's 65,536-character Issue body limit."""
+    if len(digest) <= limit:
+        return digest
+    footer = (
+        "\n\n---\nDigest truncated to fit GitHub's Issue limit. "
+        "The complete digest is stored in `commit-monitor/digests/`."
+    )
+    if run_url:
+        footer += f" Workflow run: {run_url}"
+    if len(footer) >= limit:
+        return footer[:limit]
+    return digest[:limit - len(footer)].rstrip() + footer
 
 
 def score_commit(message, files, profile=None):
@@ -758,6 +774,8 @@ def main():
     ap.add_argument("--list-targets", action="store_true",
                     help="print every configured target and exit without API calls")
     ap.add_argument("--no-save", action="store_true", help="don't update state")
+    ap.add_argument("--issue-output",
+                    help="write a GitHub-Issue-safe copy of the digest")
     args = ap.parse_args()
     if args.backfill < 0 or args.max_pages < 1:
         ap.error("--backfill must be >= 0 and --max-pages must be >= 1")
@@ -887,6 +905,17 @@ def main():
         lines.extend(f"- {error}" for error in health_errors)
     digest = "\n".join(lines)
     print(digest)
+
+    if args.issue_output:
+        server = os.environ.get("GITHUB_SERVER_URL")
+        repository = os.environ.get("GITHUB_REPOSITORY")
+        run_id = os.environ.get("GITHUB_RUN_ID")
+        run_url = (
+            f"{server}/{repository}/actions/runs/{run_id}"
+            if server and repository and run_id else ""
+        )
+        with open(args.issue_output, "w") as issue_file:
+            issue_file.write(bounded_issue_body(digest, run_url))
 
     if all_findings or health_errors:
         os.makedirs(DIGEST_DIR, exist_ok=True)
