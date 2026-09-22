@@ -1,9 +1,8 @@
 name: commit-monitor
 
-# Always-on, laptop-independent fresh-commit security monitor.
-# Runs on GitHub's infrastructure every 6h. Uses the built-in workflow token
-# for API reads (no PAT stored as a secret). On findings it opens an Issue
-# (you get an email), and commits the updated baseline state back to the repo.
+# Always-on, laptop-independent OSS fresh-commit monitor.
+# GitHub uses the built-in workflow token; public GitLab projects work without
+# credentials. Findings and state are retained even if issue notification fails.
 
 on:
   schedule:
@@ -21,6 +20,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -31,28 +31,56 @@ jobs:
       - name: Run monitor
         id: run
         env:
-          GITHUB_TOKEN: ${{ github.token }} # built-in token; reads public repos fine
+          GITHUB_TOKEN: ${{ github.token }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
-          python3 bin/commit-monitor.py --min-score 5 > digest.md 2>&1 || true
+          python3 bin/commit-monitor.py --min-score 3 > digest.md 2> run-errors.log
           echo "----- digest -----"
           cat digest.md
-          # finding headers look like '## [7] ...' — only present when there are real leads
+          cat run-errors.log
+          # Finding headers look like '## [7] ...'; coverage failures have their own section.
           if grep -q '^## \[' digest.md; then echo "found=1" >> "$GITHUB_OUTPUT"; fi
+          if grep -q '^## Monitor errors$' digest.md; then echo "degraded=1" >> "$GITHUB_OUTPUT"; fi
 
-      - name: Open issue on findings
-        if: steps.run.outputs.found == '1'
+      - name: Publish run summary
+        if: always()
+        run: |
+          cat digest.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -s run-errors.log ]; then
+            printf '\n## Monitor stderr\n```\n' >> "$GITHUB_STEP_SUMMARY"
+            cat run-errors.log >> "$GITHUB_STEP_SUMMARY"
+            printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open issue on findings or coverage failures
+        id: notify
+        if: steps.run.outputs.found == '1' || steps.run.outputs.degraded == '1'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          title="commit-monitor: coverage failure $(date -u +%F_%H%MZ)"
+          if [ "${{ steps.run.outputs.found }}" = "1" ]; then
+            title="commit-monitor: new leads $(date -u +%F_%H%MZ)"
+          fi
           gh issue create \
             --repo "$GITHUB_REPOSITORY" \
-            --title "🔴 commit-monitor: new leads $(date -u +%F_%H%MZ)" \
+            --title "$title" \
             --body-file digest.md
 
       - name: Commit updated baseline state
+        if: always() && steps.run.outcome == 'success'
         run: |
           git config user.name "commit-monitor"
           git config user.email "commit-monitor@users.noreply.github.com"
           git add -A commit-monitor/
           git diff --cached --quiet || git commit -m "monitor: state update $(date -u +%FT%TZ)"
           git push
+
+      - name: Fail on degraded coverage or notification failure
+        if: always()
+        run: |
+          if [ "${{ steps.run.outputs.degraded }}" = "1" ] || \
+             [ "${{ steps.notify.outcome }}" = "failure" ]; then
+            exit 1
+          fi

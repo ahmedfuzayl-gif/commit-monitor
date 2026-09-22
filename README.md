@@ -1,48 +1,71 @@
 # commit-monitor (always-on)
 
-Fresh-commit security monitor for bug-bounty **source review**. Runs 24/7 on GitHub Actions —
-laptop-independent. Scoring is **profile-aware**: each watched repo is scored with the vocabulary
-that fits it — `blockchain` (node-client mem-safety / consensus), `web` (web-app injection/authz/
-XSS sinks **plus new endpoint/route declarations**), or `generic` (the union, for mixed targets).
+Fresh-commit security monitor for OSS source review. Runs on GitHub Actions without a laptop and
+collects default-branch commits from both GitHub and GitLab. Scoring is profile-aware:
+`blockchain`, `web`, `systems`, `desktop`, or `generic`.
 
 ## Why this exists
 The recurring killer in OSS source-review bounties is **duplicates**: stable, released code is
 already audited, so real bugs you find were often found first (by other hunters or the vendor's
 own team). Fresh commits are un-audited by construction — reviewing them the moment they land is
-how you're *first*. This watches new commits across in-scope, **paid**, source-scoped infra repos
-and surfaces only the security-relevant delta.
+how you're *first*. The watchlist now mixes confirmed paid bounties with high-value coordinated
+disclosure programs; each entry labels its reward status and links the policy.
 
 ## How it works
-- `.github/workflows/commit-monitor.yml` runs every 6h (and on-demand from the Actions tab).
-- `bin/commit-monitor.py` fetches commits since the last-seen SHA per repo (`commit-monitor/
-  state.json`), scores each per-commit for security relevance (consensus/p2p/crypto/tx/rpc/
-  arithmetic/panics; merge commits skipped), and ranks a digest.
-- **On findings it opens a GitHub Issue** (you get an email) and commits the updated state back.
-- Uses the **built-in workflow token** for API reads — no personal token stored as a secret.
+- `.github/workflows/commit-monitor.yml` runs every 6h and supports manual dispatch.
+- `bin/commit-monitor.py` fetches every commit since the per-target SHA in
+  `commit-monitor/state.json`. GitHub and GitLab responses are normalized before scoring.
+- A target's watermark advances only after a complete commit-and-diff pass. Missing history,
+  truncated diffs, API errors, and rate limits are visible coverage failures.
+- Findings and coverage failures are saved as timestamped digests and sent to a GitHub Issue.
+  State still commits if issue notification fails, preventing one bad alert from replaying the
+  same backlog forever.
+- `GITHUB_TOKEN` uses the workflow token. Public GitLab projects need no token; an optional
+  `GITLAB_TOKEN` raises GitLab limits for large backfills.
 
 ## Reading the output
-- **🔴 SECURITY-FIX → variant-analysis**: a vendor patched a bug here. Pull the diff and hunt the
-  same pattern in sibling files they *didn't* fix. n-day → 0-day. Highest value.
-- **🟠 risky new code**: fresh attack surface — new panics/arithmetic/parsing in hot paths
-  (`blockchain`), or a **new endpoint/controller/sink** (`web`). Note: the `web` profile flags
-  feature commits that add attack surface **even with no security keyword in the subject** — a
-  brand-new file under a hot path (`controller/`, `route`, `graphql`, …) scores on its own.
-- Discipline: **reachability-FIRST** — before building any PoC, prove attacker-controlled input
-  reaches the sink AND a real trust boundary is crossed. (Hard-won lesson: a passing PoC can
-  still be demonstrating intended behavior.)
+- **`[SECURITY FIX]`**: explicit CVE/advisory/vulnerability language, or a patch carrying a
+  concrete security signal. Highest-priority variant analysis.
+- **`[PATCH]`**: an ordinary bug-fix or hardening patch. Worth sibling-path review, but not
+  mislabeled as a disclosed vulnerability.
+- **`[NEW SURFACE]`**: a feature commit, new sensitive file, endpoint, parser, unsafe primitive,
+  desktop IPC boundary, or other risky added code.
+- **`[REVIEW]`**: a lower-confidence lead that still crossed the configured score.
+
+Reachability first: prove attacker-controlled input reaches the changed code and crosses a real
+trust boundary before building a PoC.
 
 ## Watchlist
-`watchlist.json` — repos verified **paid + source-code in-scope** (Cosmos, Chia, Circle,
-Lightspark, TRON, Chainlink). Each entry sets a **`profile`** (`blockchain` | `web` | `generic`)
-that picks its scoring vocabulary; unset defaults to `blockchain`. To watch a web app (e.g. a
-GitLab-class target), add it with `"profile": "web"`. Add repos as you confirm scope on new
-programs; **verify a repo is still in-scope before reporting anything against it.**
+`watchlist.json` currently contains 38 active repositories across GitLab, WordPress, Kubernetes,
+Brave, MetaMask, major web applications, systems software, and selected active blockchain
+programs. Inactive SDK-only targets were removed.
 
-## Local use (optional)
-Also runnable locally: `python3 bin/commit-monitor.py [--backfill N] [--repo owner/name]
-[--min-score N]`. Set `GITHUB_TOKEN` env (or a chmod-600 `commit-monitor/.env`) for 5000 req/hr.
+Every entry declares:
+- `provider`: `github` or `gitlab`
+- `repo`: provider namespace/path; nested GitLab groups are supported
+- `profile`: `blockchain`, `web`, `systems`, `desktop`, or `generic`
+- `reward`: `bounty` or `vdp`
+- `policy` and `policy_checked`: evidence to re-check before testing or reporting
+
+Only explicit watchlist entries are monitored; organization-wide auto-discovery is intentionally
+disabled. Monitoring is limited to each repository's default branch unless an entry sets `branch`.
+
+## Local use
+```text
+python3 bin/commit-monitor.py --list-targets
+python3 bin/commit-monitor.py --provider gitlab --reward bounty --list-targets
+python3 bin/commit-monitor.py --repo gitlab-org/gitlab --backfill 20 --no-save
+python3 bin/commit-monitor.py --min-score 4
+```
+
+Set `GITHUB_TOKEN` and optionally `GITLAB_TOKEN` in the environment or in a chmod-600
+`commit-monitor/.env`. `--backfill N` ignores the watermark and scans exactly the newest `N`
+commits. Pair exploratory backfills with `--no-save`. A newly added target is baselined to its
+current head on the first normal run, so history is never mistaken for fresh code.
 
 ## Maintenance
-- Adjust cadence: edit the `cron:` line in the workflow (currently every 6h).
-- Noise floor: the workflow runs with `--min-score 5`; lower it for more (noisier) leads.
-- Pause: disable the workflow in the Actions tab.
+- Re-check `policy` links and `reward` labels before acting on a lead.
+- Adjust cadence in `.github/workflows/commit-monitor.yml` (currently every 6h).
+- The workflow score floor is 3; raise `--min-score` for less volume.
+- API diff size limits are reported in the digest; inspect the linked commit manually.
+- Pause by disabling the workflow in the Actions tab.

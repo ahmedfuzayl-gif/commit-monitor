@@ -9,23 +9,23 @@ is already audited and duplicate-prone; the fresh delta is where an
 undiscovered, un-raced bug lives.
 
 What it does:
-  * Watches the in-scope repos in watchlist.json (per bounty program).
-  * On each run, fetches commits since the last-seen SHA (append-only state,
-    like monitor.sh's diffnew), and surfaces ONLY the new ones.
-  * Scores each commit for security relevance, tuned for BLOCKCHAIN INFRA /
-    node clients (consensus, p2p, crypto, tx/mempool, rpc, arithmetic, panics).
-  * Flags likely SECURITY-FIX commits as top priority -- these are
-    variant-analysis gold: when a vendor patches bug X here, the same pattern
-    often survives un-fixed in a sibling file. n-day -> 0-day.
-  * Emits a ranked markdown digest; you review only the delta, then go hunt.
+  * Watches active OSS security-program repositories from GitHub and GitLab.
+  * Fetches every default-branch commit since the last-seen SHA and holds the
+    watermark whenever collection is incomplete.
+  * Separately identifies explicit security fixes, ordinary bug-fix patches,
+    and newly introduced attack surface.
+  * Scores each delta with target-specific web, systems, desktop, blockchain,
+    or generic security vocabulary.
+  * Emits a ranked markdown digest for reachability-first manual review.
 
 Usage:
-  commit-monitor.py                 # check all repos, surface new commits
-  commit-monitor.py --backfill 40   # first-run demo: score last N commits/repo
-  commit-monitor.py --repo cosmos/gaia --backfill 40   # one repo
-  commit-monitor.py --min-score 4   # only show commits at/above a score
+  commit-monitor.py
+  commit-monitor.py --backfill 40 --no-save
+  commit-monitor.py --repo gitlab-org/gitlab --backfill 20 --no-save
+  commit-monitor.py --reward bounty --min-score 4
 
-Auth: set GITHUB_TOKEN in the env for 5000 req/hr (vs 60 unauth). ~2 calls/repo.
+Auth: GITHUB_TOKEN raises GitHub's API limit. GITLAB_TOKEN is optional for
+public GitLab.com projects and useful for larger backfills.
 """
 import argparse
 import json
@@ -33,8 +33,9 @@ import os
 import re
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ~/bounty
@@ -42,7 +43,10 @@ WATCHLIST = os.path.join(BASE, "watchlist.json")
 STATE_DIR = os.path.join(BASE, "commit-monitor")
 STATE = os.path.join(STATE_DIR, "state.json")
 DIGEST_DIR = os.path.join(STATE_DIR, "digests")
-API = "https://api.github.com"
+GITHUB_API = "https://api.github.com"
+GITLAB_API = "https://gitlab.com/api/v4"
+PROVIDERS = ("github", "gitlab")
+REWARD_TYPES = ("bounty", "vdp")
 
 
 def _load_env():
@@ -65,108 +69,128 @@ def _load_env():
 
 _load_env()
 
-# ---- scoring, tuned for blockchain-infra / node-client bugs ----------------
-# Message words that flag a likely SECURITY FIX (highest value: variant-analysis
-# candidates). Weight 3 each.
-FIX_WORDS = [
-    "security", "vuln", "cve", "advisory", "exploit", "attack",
-    "panic", "overflow", "underflow", "oob", "out-of-bounds", "out of bounds",
-    "dos", "denial of service", "crash", "hang", "deadlock", "unsound",
-    "unbounded", "exhaust", "oom", "memory leak",
-    "malformed", "invalid", "reject", "sanitiz", "validat", "bounds check",
-    "unchecked", "double-spend", "double spend", "replay", "nonce reuse",
-    "consensus", "fork", "non-deterministic", "nondeterministic", "slashing",
-    "signature", "forge", "bypass", "underpriced", "griefing",
-    "authoriz", "authentic", "unauthoriz", "authz", "spoof", "tamper",
-    "leak", "disclos", "traversal", "injection", "ssrf", "rce", "poison",
-    # web app-sec fix vocabulary (used by the "web"/"generic" profiles)
-    "xss", "csrf", "idor", "sqli", "ssti", "xxe", "prototype pollution",
-    "open redirect", "privilege", "escalat", "smuggl", "path traversal",
-    "mass assignment", "insecure", "sandbox",
-]
-# Weaker generic "fix" signal. Weight 1.
-SOFT_FIX = ["fix", "bug", "incorrect", "wrong", "mishandl", "edge case", "regression"]
-
-# High-confidence security terms — unambiguous enough to scan the commit BODY,
-# not just the subject. The softer domain nouns in FIX_WORDS ("validat" ->
-# "validator", "signature", "consensus", "fork", "reject", "invalid") over-fire
-# in long bodies, so they are deliberately EXCLUDED here to keep the 🔴 tier
-# precise while still recovering fixes described in the body under a terse subject.
-STRONG_FIX_WORDS = [
+# ---- message and code-delta signals ----------------------------------------
+# Explicit vulnerability language. These terms alone are security context, not
+# proof that an ordinary "validate"/"panic"/"consensus" commit is a security fix.
+SECURITY_WORDS = [
     "security", "vuln", "cve", "advisory", "exploit", "attacker", "malicious",
-    "overflow", "underflow", "oob", "out-of-bounds", "out of bounds",
-    "panic", "crash", "unsound", "dos", "denial of service",
-    "bypass", "traversal", "injection", "ssrf", "rce", "xss", "csrf", "idor",
-    "ssti", "xxe", "deserial", "spoof", "forge", "poison", "smuggl",
-    "double-spend", "double spend", "replay", "unauthoriz", "privilege escalat",
+    "bypass", "unauthoriz", "privilege escalat", "account takeover",
+    "injection", "ssrf", "rce", "xss", "csrf", "idor", "sqli", "ssti", "xxe",
+    "prototype pollution", "request smuggling", "path traversal", "open redirect",
+    "disclos", "data leak", "credential leak", "secret leak", "exfiltrat",
+    "double-spend", "double spend", "nonce reuse", "signature forg",
+]
+
+# Patch language is deliberately separate from SECURITY_WORDS. Most fixes are
+# worth variant review, but must not be mislabeled as disclosed vulnerabilities.
+PATCH_WORDS = [
+    "fix", "bug", "prevent", "avoid", "harden", "mitigat", "incorrect", "wrong",
+    "mishandl", "regression", "edge case", "panic", "crash", "overflow",
+    "underflow", "oob", "out-of-bounds", "out of bounds", "bounds check",
+    "deadlock", "hang", "unbounded", "exhaust", "oom", "memory leak",
+    "malformed", "reject", "sanitiz", "validat", "unchecked", "race condition",
+    "use-after-free", "double free", "null deref", "nondeterministic",
+]
+
+FEATURE_WORDS = [
+    "add ", "adds ", "added ", "introduc", "implement", "support ", "enable ",
+    "expose ", "new ", "allow ", "create ", "initial ",
 ]
 
 # ---- per-target profiles ---------------------------------------------------
-# A watchlist entry selects one via "profile": "blockchain" | "web" | "generic".
-#   * paths  -> security-relevant path fragments (CONTEXT signal, weight 2 capped)
-#   * flags  -> red-flag substrings on ADDED lines (fresh attack surface)
-# "blockchain" is the historical default (node-client mem-safety / consensus).
-# "web" swaps in injection/authz/XSS sinks AND new-endpoint/route declarations,
-# so a feature commit that adds attack surface surfaces even with NO security
-# keyword in the subject -- the GitLab / web-app case. "generic" is the union,
-# for mixed or unclassified targets.
 _BLOCKCHAIN_PATHS = [
     "consensus", "crypto", "/sig", "signature", "/key", "p2p", "/net",
-    "rpc", "/api", "mempool", "txpool", "/tx", "/vm", "evm", "/state",
+    "rpc", "/api", "api/", "mempool", "txpool", "/tx", "/vm", "evm", "/state",
     "validator", "stake", "slash", "/gov", "/bank", "ibc", "bridge",
     "serde", "codec", "decode", "deserial", "rlp", "ssz", "borsh", "proto",
-    "verify", "/auth", "gas", "fee",
+    "verify", "/auth", "auth/", "gas", "fee", "wallet",
 ]
 _BLOCKCHAIN_FLAGS = [
     ".unwrap(", ".expect(", "panic!(", "unreachable!(", "unsafe ",
     "unchecked", "get_unchecked", "transmute", "from_raw", "as usize",
     "as u64", "as u32", "as i64", "memcpy", "while true", "loop {",
-    "saturating_", "wrapping_", "overflowing_",
-    "recover(", "ecrecover", "assert(", "require(",
+    "saturating_", "wrapping_", "overflowing_", "recover(", "ecrecover",
+    "assert(", "require(",
 ]
+
 _WEB_PATHS = [
-    "controller", "/api", "route", "handler", "graphql", "resolver",
-    "/auth", "session", "/admin", "middleware", "policy", "policies",
-    "serializer", "webhook", "upload", "download", "template", "render",
-    "redirect", "oauth", "saml", "/sso", "jwt", "password", "login",
-    "account", "permission", "/acl", "csrf", "cors", "import", "export",
-    "proxy", "/url", "/file", "settings", "/models", "/views", "query",
+    "controller", "api/", "/api", "route", "handler", "graphql", "resolver",
+    "mutation", "auth/", "/auth", "session", "admin", "middleware", "policy",
+    "serializer", "webhook", "upload", "download", "storage", "template",
+    "render", "redirect", "oauth", "saml", "sso", "jwt", "password", "login",
+    "account", "permission", "acl", "csrf", "cors", "import", "export",
+    "proxy", "/url", "/file", "settings", "models/", "views/", "query",
+    "service", "worker", "job", "integration", "plugin", "extension", "ai/",
 ]
 _WEB_FLAGS = [
     # command / code execution
     "system(", "exec(", "eval(", "popen(", "subprocess", "child_process",
-    "os.system", "shell_exec", "proc_open", "Runtime.getRuntime",
-    "ProcessBuilder", "new Function(", "spawn(", "execSync(",
-    # sql
-    ".raw(", "find_by_sql", "createQueryBuilder", "sequelize.query",
-    "executeQuery(", "rawQuery(", "String.format", 'f"SELECT', 'f"select',
-    # deserialization
-    "pickle.loads", "yaml.load", "Marshal.load", "unserialize(",
-    "readObject", "ObjectInputStream",
-    # xss / html injection
-    "html_safe", "dangerouslySetInnerHTML", ".innerHTML", "v-html",
-    "mark_safe", "bypassSecurityTrust", "Markup(", "|safe",
-    # ssrf / file access
-    "send_file", "sendFile", "path.join(", "File.read", "readFileSync(",
-    "requests.get(", "urllib.request", "fetch(", "curl_exec",
-    # auth / authz weakening
-    "skip_before_action", "permit!", "verify=false", "verify: false",
-    "InsecureSkipVerify", "jwt.decode", "params.require",
-    # NEW route / endpoint surface (feature commits = new attack surface)
-    "resources :", "namespace :", "@app.route", "@router.", "Route::",
-    "@GetMapping", "@PostMapping", "@RequestMapping", "app.get(", "app.post(",
-    "router.get(", "router.post(", "addRoute", ".route(",
+    "os.system", "shell_exec", "proc_open", "runtime.getruntime",
+    "processbuilder", "new function(", "spawn(", "execsync(",
+    # SQL and unsafe deserialization
+    ".raw(", "find_by_sql", "createquerybuilder", "sequelize.query",
+    "executequery(", "rawquery(", "string.format", "pickle.loads", "yaml.load",
+    "marshal.load", "unserialize(", "readobject", "objectinputstream",
+    # HTML / template injection
+    "html_safe", "dangerouslysetinnerhtml", ".innerhtml", "v-html",
+    "mark_safe", "bypasssecuritytrust", "markup(", "|safe",
+    # outbound requests and file access
+    "send_file", "sendfile", "path.join(", "file.read", "readfilesync(",
+    "requests.get(", "urllib.request", "fetch(", "curl_exec", "http.get(",
+    # authorization weakening
+    "skip_before_action", "skip_authorization", "permit!", "verify=false",
+    "verify: false", "insecureskipverify", "jwt.decode", "params.require",
+    # route / endpoint declarations
+    "resources :", "namespace :", "@app.route", "@router.", "route::",
+    "@getmapping", "@postmapping", "@requestmapping", "app.get(", "app.post(",
+    "router.get(", "router.post(", "addroute", ".route(", "mount ",
+]
+
+_SYSTEMS_PATHS = [
+    "parser", "parse", "protocol", "packet", "frame", "codec", "decode",
+    "deserial", "network", "/net", "http", "tls", "ssl", "crypto", "auth",
+    "permission", "privilege", "sandbox", "process", "command", "exec", "shell",
+    "archive", "compress", "extract", "upload", "download", "storage", "ipc",
+    "rpc", "proxy", "socket", "ssh", "path", "file", "memory", "allocator",
+]
+_SYSTEMS_FLAGS = [
+    "unsafe ", "memcpy(", "memmove(", "strcpy(", "strcat(", "sprintf(",
+    "malloc(", "calloc(", "realloc(", "free(", "from_raw", "transmute",
+    "get_unchecked", ".unwrap(", ".expect(", "panic!(", "assert(",
+    "reinterpret_cast", "static_cast", "system(", "exec", "popen(",
+    "subprocess", "processbuilder", "shell=true", "insecureskipverify",
+]
+
+_DESKTOP_PATHS = [
+    "renderer", "browser", "extension", "webview", "webcontents", "ipc",
+    "preload", "deeplink", "deep-link", "protocol", "navigation", "download",
+    "permission", "wallet", "sign", "keyring", "secret", "clipboard",
+]
+_DESKTOP_FLAGS = [
+    "nodeintegration: true", "contextisolation: false", "sandbox: false",
+    "websecurity: false", "allowrunninginsecurecontent", "executejavascript(",
+    "openexternal(", "setwindowopenhandler", "ipcmain.handle", "ipcrenderer.send",
+    "postmessage(", "addEventListener(\"message", "addeventlistener('message",
 ]
 
 PROFILES = {
     "blockchain": {"paths": _BLOCKCHAIN_PATHS, "flags": _BLOCKCHAIN_FLAGS},
     "web": {"paths": _WEB_PATHS, "flags": _WEB_FLAGS},
+    "systems": {"paths": _SYSTEMS_PATHS, "flags": _SYSTEMS_FLAGS},
+    "desktop": {
+        "paths": sorted(set(_DESKTOP_PATHS) | set(_WEB_PATHS) | set(_SYSTEMS_PATHS)),
+        "flags": sorted(set(_DESKTOP_FLAGS) | set(_WEB_FLAGS) | set(_SYSTEMS_FLAGS)),
+    },
     "generic": {
-        "paths": sorted(set(_BLOCKCHAIN_PATHS) | set(_WEB_PATHS)),
-        "flags": sorted(set(_BLOCKCHAIN_FLAGS) | set(_WEB_FLAGS)),
+        "paths": sorted(
+            set(_BLOCKCHAIN_PATHS) | set(_WEB_PATHS) | set(_SYSTEMS_PATHS)
+        ),
+        "flags": sorted(
+            set(_BLOCKCHAIN_FLAGS) | set(_WEB_FLAGS) | set(_SYSTEMS_FLAGS)
+        ),
     },
 }
-DEFAULT_PROFILE = "blockchain"
+DEFAULT_PROFILE = "generic"
 
 # Noise signals: commits that are almost never a security fix / new attack
 # surface. A subject starting with one of these prefixes, or containing one of
@@ -201,37 +225,51 @@ def _wordmatch(words, text):
     return sorted(hits)
 
 
-def gh_get(path, _tries=3):
-    url = path if path.startswith("http") else API + path
-    tok = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+def _json_get(url, headers, token=None, token_header="Authorization",
+              token_prefix="Bearer ", _tries=3):
     last = None
     for attempt in range(_tries):
-        req = urllib.request.Request(url, headers={
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "commit-monitor",
-        })
-        if tok:
-            req.add_header("Authorization", f"Bearer {tok}")
+        req = urllib.request.Request(url, headers=headers)
+        if token:
+            req.add_header(token_header, token_prefix + token)
         try:
-            with urllib.request.urlopen(req, timeout=45) as r:
-                return json.load(r), None
-        except urllib.error.HTTPError as e:
-            body = e.read().decode(errors="ignore").lower()
-            rem = e.headers.get("X-RateLimit-Remaining")
-            # primary limit: 403 + remaining==0; secondary/abuse limit: 429, or
-            # 403 whose body says rate/abuse. Signal RATE_LIMIT so callers HOLD
-            # their watermark and retry next run instead of burying commits.
-            if (e.code in (403, 429) and
-                    (rem == "0" or "rate limit" in body or "abuse" in body
-                     or "secondary rate" in body)):
+            with urllib.request.urlopen(req, timeout=45) as response:
+                return json.load(response), None
+        except urllib.error.HTTPError as error:
+            body = error.read().decode(errors="ignore").lower()
+            remaining = error.headers.get("X-RateLimit-Remaining")
+            if (error.code in (403, 429) and
+                    (remaining == "0" or "rate limit" in body or "abuse" in body
+                     or "secondary rate" in body or "too many requests" in body)):
                 return None, "RATE_LIMIT"
-            return None, f"HTTP {e.code}"
-        except Exception as e:
-            # transient (IncompleteRead, timeout, reset): back off and retry
-            last = str(e)
+            if 500 <= error.code < 600 and attempt + 1 < _tries:
+                last = f"HTTP {error.code}"
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            return None, f"HTTP {error.code}"
+        except Exception as error:
+            last = str(error)
             time.sleep(1.5 * (attempt + 1))
     return None, last
+
+
+def gh_get(path, _tries=3):
+    url = path if path.startswith("http") else GITHUB_API + path
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    return _json_get(url, {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "commit-monitor",
+    }, token=token, _tries=_tries)
+
+
+def gl_get(path, _tries=3):
+    url = path if path.startswith("http") else GITLAB_API + path
+    token = os.environ.get("GITLAB_TOKEN") or os.environ.get("GL_TOKEN")
+    return _json_get(url, {
+        "Accept": "application/json",
+        "User-Agent": "commit-monitor",
+    }, token=token, token_header="PRIVATE-TOKEN", token_prefix="", _tries=_tries)
 
 
 def load_json(path, default):
@@ -266,297 +304,591 @@ def save_json(path, obj):
 
 
 def score_commit(message, files, profile=None):
-    """Return (score, reasons[], is_secfix). files = list of {filename, patch?, status?}.
-    `profile` selects the paths/flags vocabulary (see PROFILES).
+    """Return ``(score, reasons, kind)`` for one normalized commit diff.
 
-    Signal weighting (v2):
-      * A real FIX_WORD in the subject = a patched security bug -> variant-analysis
-        gold (hunt the un-fixed siblings). Highest weight; flags is_secfix.
-      * Risky NEW code (profile flags on added lines) = fresh attack surface. Boosted,
-        since a new .unwrap()/panic! (blockchain) or new endpoint/sink (web) is the
-        most direct "review this now" signal.
-      * A NEW FILE added under a hot path (web/generic profiles) = brand-new attack
-        surface even with no keyword -- catches feature commits, the GitLab case.
-      * Hot paths are CONTEXT, not a standalone driver: they only add points when there
-        is already a fix or risky-code signal (so a pure cleanup touching a
-        consensus/proto file no longer scores high on filename matches alone).
-      * Small, focused fixes get a bonus (a targeted security patch, not a big refactor).
-      * Cleanup/docs/test/dep-bump churn gets a strong penalty.
+    ``kind`` is one of ``security_fix``, ``patch``, ``new_surface``, or
+    ``review``. Ordinary bug fixes are intentionally not called security fixes.
     """
-    prof_name = profile if profile in PROFILES else DEFAULT_PROFILE
-    hot_paths = PROFILES[prof_name]["paths"]
-    code_flags = PROFILES[prof_name]["flags"]
+    profile_name = profile if profile in PROFILES else DEFAULT_PROFILE
+    hot_paths = PROFILES[profile_name]["paths"]
+    code_flags = PROFILES[profile_name]["flags"]
 
     reasons = []
     score = 0
-    full = message.lower()
-    subj = full.split("\n", 1)[0][:200]
-    body = full[len(subj):][:2000]  # first ~2k of the body, bounded
+    full_message = message.lower()
+    subject = full_message.split("\n", 1)[0][:200]
+    body = full_message[len(subject):][:2000]
+    is_noise = (
+        subject.startswith(NEG_PREFIXES)
+        or any(word in subject for word in NEG_WORDS)
+    )
 
-    is_noise = subj.startswith(NEG_PREFIXES) or any(w in subj for w in NEG_WORDS)
+    security_hits = _wordmatch(SECURITY_WORDS, subject)
+    body_security_hits = [
+        word for word in _wordmatch(SECURITY_WORDS, body)
+        if word not in security_hits
+    ]
+    patch_hits = _wordmatch(PATCH_WORDS, subject)
+    feature_hits = _wordmatch(FEATURE_WORDS, subject)
+    cves = sorted(set(re.findall(r"cve-\d{4}-\d{4,7}", full_message)))
+    disclosure_terms = {"advisory", "vuln", "cve"}
+    is_security_fix = bool(
+        cves
+        or disclosure_terms.intersection(security_hits)
+        or (patch_hits and (security_hits or body_security_hits))
+    )
 
-    fix_hits = _wordmatch(FIX_WORDS, subj)
-    soft_hits = _wordmatch(SOFT_FIX, subj)
-    # The security signal often lives in the BODY under a terse subject
-    # ("Fixes CVE-...", "prevents a panic when..."). Scan it with the
-    # high-confidence subset only, and lift explicit CVE IDs as a strong signal.
-    body_fix = [w for w in _wordmatch(STRONG_FIX_WORDS, body) if w not in fix_hits]
-    cves = sorted(set(re.findall(r"cve-\d{4}-\d{4,7}", full)))
-
-    def _is_noise_file(fn):
-        fn = fn.lower()
+    def is_noise_file(filename):
+        filename = filename.lower()
         return bool(re.search(
-            r"(_test\.|\.test\.|\.spec\.|/tests?/|tests?\.rs$|/mocks?/|/fixtures?/|/testdata/"
-            r"|\.pb\.go$|_pb2\.py$|\.generated\.|/vendor/|/node_modules/"
-            r"|\.md$|\.txt$|\.lock$|\.snap$|/docs?/"
-            # generated FFI / wasm / SDK-binding artifacts (not hand-written surface)
-            r"|/wasm/|wasm-browser|wasm-nodejs|_bg\.wasm|\.wasm$|\.d\.ts$"
-            r"|uniffi|ffi\.|\.udl$|xcframework|/jnilibs/|\.framework/"
-            r"|_generated\.|/generated/|\.min\.js$)", fn))
+            r"(_test\.|_spec\.|\.test\.|\.spec\.|(^|/)tests?/"
+            r"|(^|/)spec/|(^|/)test_|tests?\.rs$"
+            r"|(^|/)mocks?/|(^|/)fixtures?/|(^|/)testdata/"
+            r"|\.pb\.go$|_pb2\.py$|\.generated\.|(^|/)vendor/"
+            r"|(^|/)node_modules/|\.md$|\.txt$|\.lock$|\.snap$"
+            r"|(^|/)docs?/|(^|/)wasm/|wasm-browser|wasm-nodejs"
+            r"|_bg\.wasm|\.wasm$|\.d\.ts$|uniffi|ffi\.|\.udl$"
+            r"|xcframework|/jnilibs/|\.framework/|_generated\."
+            r"|(^|/)generated/|\.min\.js$)",
+            filename,
+        ))
 
-    code_hits, loc_added = set(), 0
+    code_hits = set()
+    lines_added = 0
     new_surface_files = []
-    for f in files:
-        fn = f.get("filename", "")
-        if _is_noise_file(fn):
-            continue  # tests/generated/docs are not new attack surface
-        low = fn.lower()
-        if f.get("status") == "added" and any(p in low for p in hot_paths):
-            new_surface_files.append(fn)  # brand-new file in a sensitive area
-        for line in (f.get("patch", "") or "").split("\n"):
+    relevant_files = []
+    for file_change in files:
+        filename = file_change.get("filename", "")
+        if is_noise_file(filename):
+            continue
+        relevant_files.append(file_change)
+        lowered_filename = filename.lower()
+        if (file_change.get("status") == "added"
+                and any(path in lowered_filename for path in hot_paths)):
+            new_surface_files.append(filename)
+        for line in (file_change.get("patch", "") or "").split("\n"):
             if line.startswith("+") and not line.startswith("+++"):
-                loc_added += 1
+                lines_added += 1
+                added_line = line[1:].lower()
                 for flag in code_flags:
-                    if flag in line:
-                        code_hits.add(flag)
-    path_hits = sorted({p.strip("/") for f in files
-                        if not _is_noise_file(f.get("filename", ""))
-                        for p in hot_paths if p in f.get("filename", "").lower()})
+                    if flag.lower() in added_line:
+                        code_hits.add(flag.lower())
 
-    is_secfix = bool(fix_hits) or bool(cves) or bool(body_fix)
+    path_hits = sorted({
+        path.strip("/")
+        for file_change in relevant_files
+        for path in hot_paths
+        if path in file_change.get("filename", "").lower()
+    })
+    feature_surface = bool(feature_hits and path_hits)
 
-    if fix_hits:
-        score += 4 + min(len(fix_hits), 2)   # 5-6: real fix-word in subject
-        reasons.append("FIX-signal: " + ", ".join(fix_hits[:5]))
-    elif body_fix:
-        score += 3 + min(len(body_fix), 2)   # 4-5: strong term in body, not subject
-        reasons.append("FIX-signal (body): " + ", ".join(body_fix[:5]))
-    elif soft_hits:
-        score += 1
-        reasons.append("generic-fix: " + ", ".join(soft_hits[:3]))
+    if is_security_fix:
+        score += 6
+        signal_hits = security_hits or body_security_hits
+        if signal_hits:
+            reasons.append("explicit security-fix signal: " + ", ".join(signal_hits[:5]))
+    elif security_hits or body_security_hits:
+        score += 2
+        reasons.append(
+            "security context: " + ", ".join((security_hits + body_security_hits)[:5])
+        )
+
+    if patch_hits:
+        score += 3 + min(len(patch_hits), 2)
+        reasons.append("patch signal: " + ", ".join(patch_hits[:5]))
 
     if cves:
-        score += 3                            # explicit CVE reference: strong standalone
+        score += 3
         reasons.append("CVE referenced: " + ", ".join(cves[:4]))
 
     if code_hits:
-        score += min(2 * len(code_hits), 6)   # boosted: risky new code
-        reasons.append("risky-code: " + ", ".join(sorted(code_hits)[:6]))
+        score += min(2 * len(code_hits), 6)
+        reasons.append("risky added code: " + ", ".join(sorted(code_hits)[:6]))
 
-    if new_surface_files and prof_name in ("web", "generic"):
-        score += 2 + min(len(new_surface_files), 2)   # 3-4: new endpoint/handler file
-        reasons.append("NEW attack surface (added file in hot path): "
-                       + ", ".join(os.path.basename(p) for p in new_surface_files[:3]))
+    if new_surface_files:
+        score += 2 + min(len(new_surface_files), 2)
+        reasons.append(
+            "new attack-surface file: "
+            + ", ".join(os.path.basename(path) for path in new_surface_files[:3])
+        )
 
-    if path_hits and (fix_hits or code_hits or new_surface_files):
-        score += min(len(path_hits), 3)        # context bonus, only with a signal
-        reasons.append("hot-paths: " + ", ".join(path_hits[:6]))
+    if feature_surface:
+        score += 2
+        reasons.append("feature introduction: " + ", ".join(feature_hits[:3]))
+
+    has_primary_signal = bool(
+        security_hits or body_security_hits or patch_hits or code_hits
+        or new_surface_files or feature_surface
+    )
+    if path_hits and has_primary_signal:
+        score += min(len(path_hits), 3)
+        reasons.append("hot paths: " + ", ".join(path_hits[:6]))
     elif path_hits:
-        reasons.append("(touches " + ", ".join(path_hits[:4]) + " but no fix/risky-code signal)")
+        reasons.append(
+            "touches " + ", ".join(path_hits[:4]) + " without a primary signal"
+        )
 
-    if (fix_hits or body_fix) and 0 < loc_added <= 40 and len(files) <= 4:
-        score += 2                              # small, focused fix = sharp variant target
-        reasons.append("small focused fix -> variant-analysis target")
+    if ((is_security_fix or patch_hits)
+            and 0 < lines_added <= 40 and len(relevant_files) <= 4):
+        score += 2
+        reasons.append("small focused patch -> variant-review target")
 
     if is_noise:
         score = max(0, score - 4)
-        reasons.append("down-weighted: cleanup/docs/test/dep noise")
+        reasons.append("down-weighted: cleanup/docs/test/dependency noise")
 
-    return score, reasons, is_secfix
+    if is_security_fix:
+        kind = "security_fix"
+    elif patch_hits:
+        kind = "patch"
+    elif code_hits or new_surface_files or feature_surface:
+        kind = "new_surface"
+    else:
+        kind = "review"
+    return score, reasons, kind
 
 
-def gh_commits_since(repo, last_sha, backfill, cap_pages=10):
-    """Walk /commits newest->oldest, PAGING until we reach last_sha (exclusive),
-    collect `backfill` commits when baselining, or run out of history.
+def _normalize_github_commit(item, repo):
+    metadata = item.get("commit") or {}
+    author = metadata.get("author") or metadata.get("committer") or {}
+    return {
+        "sha": item["sha"],
+        "parents": [parent.get("sha") for parent in item.get("parents", [])],
+        "message": metadata.get("message", ""),
+        "date": author.get("date", ""),
+        "author": author.get("name", "unknown"),
+        "url": item.get("html_url") or f"https://github.com/{repo}/commit/{item['sha']}",
+    }
 
-    Returns (new, head, status):
-      * status None       -> clean: the watermark boundary (or end of history,
-                             or the backfill count) was reached.
-      * status "INCOMPLETE"-> hit the page cap with the watermark still not found,
-                             i.e. more than cap_pages*100 commits landed since the
-                             last run. The older tail is UNSEEN -> caller must HOLD
-                             the watermark and surface it (don't silently bury it).
-      * any other string  -> hard error from gh_get ("RATE_LIMIT" / "HTTP ...").
-    """
+
+def _normalize_gitlab_commit(item, repo):
+    return {
+        "sha": item["id"],
+        "parents": item.get("parent_ids", []),
+        "message": item.get("message") or item.get("title", ""),
+        "date": item.get("authored_date") or item.get("committed_date", ""),
+        "author": item.get("author_name", "unknown"),
+        "url": item.get("web_url")
+               or f"https://gitlab.com/{repo}/-/commit/{item['id']}",
+    }
+
+
+def _collect_commits(fetch_page, normalize, last_sha, backfill, cap_pages):
+    """Collect normalized commits newest-first without crossing a saved SHA."""
     new, head = [], None
-    baseline = last_sha is None
-    max_pages = 1 if (baseline and backfill) else cap_pages
+    forced_backfill = backfill > 0
+    max_pages = max(1, (backfill + 99) // 100) if forced_backfill else cap_pages
     for page in range(1, max_pages + 1):
-        batch, err = gh_get(f"/repos/{repo}/commits?per_page=100&page={page}")
-        if err:
-            return new, head, err
+        batch, error = fetch_page(page)
+        if error:
+            return new, head, error
         if not batch:
-            return new, head, None                 # ran off the end of history: clean
+            if last_sha and not forced_backfill:
+                return new, head, "WATERMARK_MISSING"
+            return new, head, None
+        commits = [normalize(item) for item in batch]
         if head is None:
-            head = batch[0]["sha"]
-        for c in batch:
-            if not baseline and c["sha"] == last_sha:
-                return new, head, None             # boundary reached: clean
-            new.append(c)
-            if baseline and backfill and len(new) >= backfill:
+            head = commits[0]["sha"]
+        for commit in commits:
+            if not forced_backfill and last_sha and commit["sha"] == last_sha:
                 return new, head, None
+            new.append(commit)
+            if forced_backfill and len(new) >= backfill:
+                return new[:backfill], head, None
+        if len(batch) < 100:
+            if last_sha and not forced_backfill:
+                return new, head, "WATERMARK_MISSING"
+            return new, head, None
+    if forced_backfill:
+        return new[:backfill], head, None
     return new, head, "INCOMPLETE"
 
 
-def process_repo(entry, state, backfill, min_score):
-    repo = entry["repo"]
-    prog = entry.get("program", "?")
-    st = state.setdefault(repo, {})
-    last = st.get("last_sha")
+def gh_commits_since(repo, last_sha, backfill, cap_pages=10, branch=None):
+    def fetch_page(page):
+        query = {"per_page": 100, "page": page}
+        if branch:
+            query["sha"] = branch
+        return gh_get(f"/repos/{repo}/commits?{urllib.parse.urlencode(query)}")
 
-    # First sight with no --backfill: baseline to HEAD, don't score history.
+    return _collect_commits(
+        fetch_page,
+        lambda item: _normalize_github_commit(item, repo),
+        last_sha,
+        backfill,
+        cap_pages,
+    )
+
+
+def gl_commits_since(repo, last_sha, backfill, cap_pages=10, branch=None):
+    project = urllib.parse.quote(repo, safe="")
+
+    def fetch_page(page):
+        query = {"per_page": 100, "page": page}
+        if branch:
+            query["ref_name"] = branch
+        return gl_get(
+            f"/projects/{project}/repository/commits?{urllib.parse.urlencode(query)}"
+        )
+
+    return _collect_commits(
+        fetch_page,
+        lambda item: _normalize_gitlab_commit(item, repo),
+        last_sha,
+        backfill,
+        cap_pages,
+    )
+
+
+def target_provider(entry):
+    return entry.get("provider", "github")
+
+
+def target_key(entry):
+    provider = target_provider(entry)
+    return entry["repo"] if provider == "github" else f"{provider}:{entry['repo']}"
+
+
+def commits_since(entry, last_sha, backfill, cap_pages=10):
+    args = (
+        entry["repo"],
+        last_sha,
+        backfill,
+        cap_pages,
+        entry.get("branch"),
+    )
+    if target_provider(entry) == "gitlab":
+        return gl_commits_since(*args)
+    return gh_commits_since(*args)
+
+
+def gh_commit_files(repo, sha, cap_pages=10):
+    files = []
+    for page in range(1, cap_pages + 1):
+        detail, error = gh_get(
+            f"/repos/{repo}/commits/{sha}?per_page=100&page={page}"
+        )
+        if error:
+            return files, error
+        batch = detail.get("files", [])
+        files.extend(batch)
+        if len(batch) < 100:
+            return files, None
+    return files, "DIFF_TRUNCATED"
+
+
+def gl_commit_files(repo, sha, cap_pages=10):
+    project = urllib.parse.quote(repo, safe="")
+    files = []
+    for page in range(1, cap_pages + 1):
+        query = urllib.parse.urlencode({"per_page": 100, "page": page})
+        batch, error = gl_get(
+            f"/projects/{project}/repository/commits/{sha}/diff?{query}"
+        )
+        if error:
+            return files, error
+        files.extend({
+            "filename": item.get("new_path") or item.get("old_path", ""),
+            "status": (
+                "added" if item.get("new_file")
+                else "removed" if item.get("deleted_file")
+                else "renamed" if item.get("renamed_file")
+                else "modified"
+            ),
+            "patch": item.get("diff", ""),
+            "patch_limited": bool(item.get("collapsed") or item.get("too_large")),
+        } for item in batch)
+        if len(batch) < 100:
+            return files, None
+    return files, "DIFF_TRUNCATED"
+
+
+def commit_files(entry, sha, cap_pages=10):
+    if target_provider(entry) == "gitlab":
+        return gl_commit_files(entry["repo"], sha, cap_pages)
+    return gh_commit_files(entry["repo"], sha, cap_pages)
+
+
+def process_repo(entry, state, backfill, min_score, cap_pages=10):
+    repo = entry["repo"]
+    provider = target_provider(entry)
+    key = target_key(entry)
+    program = entry.get("program", "?")
+    target_state = state.setdefault(key, {})
+    last = target_state.get("last_sha")
+
     if last is None and not backfill:
-        commits, err = gh_get(f"/repos/{repo}/commits?per_page=1")
-        if err:
-            return [], err
-        if not commits:
+        commits, head, error = commits_since(entry, None, 1, cap_pages)
+        if error:
+            return [], error
+        if not commits or head is None:
             return [], "no commits"
-        st["last_sha"] = commits[0]["sha"]
-        st["default_branch_head_seen"] = datetime.now(timezone.utc).isoformat()
+        target_state["last_sha"] = head
+        target_state["last_checked_at"] = datetime.now(timezone.utc).isoformat()
         return [], "BASELINED (run again after new commits, or use --backfill)"
 
-    new, head, status = gh_commits_since(repo, last, backfill)
-    if status and status != "INCOMPLETE":
-        return [], status                          # RATE_LIMIT / HTTP: HOLD watermark
+    new, head, status = commits_since(entry, last, backfill, cap_pages)
+    collection_gap = status in ("INCOMPLETE", "WATERMARK_MISSING")
+    if status and not collection_gap:
+        return [], status
     if head is None:
         return [], "no commits"
     if not new:
-        st["last_sha"] = head
+        target_state["last_sha"] = head
+        target_state["last_checked_at"] = datetime.now(timezone.utc).isoformat()
         return [], "no new commits"
 
-    # Score PER-COMMIT (accurate) rather than on an aggregate diff. Merge
-    # commits (2+ parents) carry no changes of their own -- the real diff is in
-    # their child commits -- so skip them as noise. One detail call per
-    # non-merge commit; in normal operation there are only a handful of new
-    # commits per run. (--backfill N is the expensive outlier: up to N calls.)
-    #
-    # CRITICAL: the watermark advances ONLY on a fully-clean pass. If a page was
-    # missing (INCOMPLETE) or any per-commit detail fetch fails, we HOLD last_sha
-    # and re-scan next run (a harmless duplicate in the digest) rather than
-    # advance past a commit we never actually scored -- recall is the mission.
     findings = []
-    n_merges = 0
-    incomplete = (status == "INCOMPLETE")
-    for c in new:
-        if len(c.get("parents", [])) > 1:
-            n_merges += 1
-            continue
-        msg = c["commit"]["message"]
-        detail, derr = gh_get(f"/repos/{repo}/commits/{c['sha']}")
-        if derr == "RATE_LIMIT":
-            return findings, "RATE_LIMIT"          # bail; last_sha NOT advanced
-        if derr:
-            incomplete = True                      # transient/HTTP: degrade + retry
-            files = []
-        else:
-            files = detail.get("files", [])
-        score, reasons, is_fix = score_commit(msg, files, entry.get("profile"))
+    merge_count = 0
+    incomplete = collection_gap
+    for commit in new:
+        if len(commit.get("parents", [])) > 1:
+            merge_count += 1
+        files, error = commit_files(entry, commit["sha"], cap_pages)
+        if error == "RATE_LIMIT":
+            return findings, "RATE_LIMIT"
+        if error:
+            incomplete = True
+        score, reasons, kind = score_commit(
+            commit["message"], files, entry.get("profile")
+        )
+        limited = sum(1 for item in files if item.get("patch_limited"))
+        if limited:
+            reasons.append(f"{limited} GitLab patch(es) omitted by provider size limits")
         if score >= min_score:
             findings.append({
-                "repo": repo, "program": prog,
+                "repo": repo,
+                "provider": provider,
+                "program": program,
+                "reward": entry.get("reward", "vdp"),
                 "profile": entry.get("profile") or DEFAULT_PROFILE,
-                "sha": c["sha"][:10],
-                "url": f"https://github.com/{repo}/commit/{c['sha']}",
-                "date": c["commit"]["author"]["date"],
-                "author": c["commit"]["author"]["name"],
-                "subject": msg.split("\n")[0][:120],
-                "score": score, "reasons": reasons, "is_fix": is_fix,
+                "sha": commit["sha"][:10],
+                "url": commit["url"],
+                "date": commit["date"],
+                "author": commit["author"],
+                "subject": commit["message"].split("\n")[0][:120],
+                "score": score,
+                "reasons": reasons,
+                "kind": kind,
             })
         time.sleep(0.15)
 
-    scored = len(new) - n_merges
+    scored = len(new)
     if incomplete:
-        # Watermark HELD on purpose: surface loudly so it gets a manual --backfill.
-        reason = "gap >1000 commits since last run" if status == "INCOMPLETE" else "a detail fetch failed"
+        if status == "INCOMPLETE":
+            reason = f"gap >{cap_pages * 100} commits since last run"
+        elif status == "WATERMARK_MISSING":
+            reason = "saved watermark is no longer reachable"
+        else:
+            reason = "a commit diff fetch failed or was truncated"
+        retry_pages = max(20, cap_pages * 2)
         note = (f"PARTIAL ({scored} scored) — last_sha HELD for retry ({reason}); "
-                f"run: commit-monitor.py --repo {repo} --backfill 200")
+                f"run: commit-monitor.py --repo {repo} --max-pages {retry_pages}")
     else:
-        st["last_sha"] = head
-        note = f"scored {scored} non-merge commit(s), skipped {n_merges} merge(s)"
+        target_state["last_sha"] = head
+        target_state["last_checked_at"] = datetime.now(timezone.utc).isoformat()
+        note = f"scored {scored} commit(s), including {merge_count} merge(s)"
     return findings, note
+
+
+def validate_repos(repos):
+    """Return actionable configuration errors instead of silently omitting targets."""
+    if not isinstance(repos, list):
+        return ["watchlist 'repos' must be a list"]
+    errors, seen = [], set()
+    for index, entry in enumerate(repos):
+        if not isinstance(entry, dict):
+            errors.append(f"entry {index} must be an object")
+            continue
+        repo = entry.get("repo")
+        if (not isinstance(repo, str)
+                or not re.fullmatch(r"[^/\s]+(?:/[^/\s]+)+", repo)):
+            errors.append(
+                f"entry {index} has invalid repo {repo!r}; expected namespace/name"
+            )
+            continue
+        provider = entry.get("provider", "github")
+        if provider not in PROVIDERS:
+            errors.append(
+                f"{repo}: unknown provider {provider!r}; valid: {', '.join(PROVIDERS)}"
+            )
+        key = (provider, repo)
+        if key in seen:
+            errors.append(f"duplicate target: {provider}:{repo}")
+        seen.add(key)
+        profile = entry.get("profile")
+        if profile and profile not in PROFILES:
+            errors.append(
+                f"{repo}: unknown profile {profile!r}; valid: {', '.join(PROFILES)}"
+            )
+        reward = entry.get("reward")
+        if reward and reward not in REWARD_TYPES:
+            errors.append(
+                f"{repo}: unknown reward {reward!r}; valid: {', '.join(REWARD_TYPES)}"
+            )
+        branch = entry.get("branch")
+        if branch is not None and (not isinstance(branch, str) or not branch.strip()):
+            errors.append(f"{repo}: branch must be a non-empty string")
+    return errors
+
+
+def note_is_error(note):
+    """True when a target was not completely and reliably monitored."""
+    if not note:
+        return True
+    return not (
+        note == "no new commits"
+        or note.startswith("scored ")
+        or note.startswith("BASELINED ")
+    )
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--backfill", type=int, default=0,
-                    help="score the last N commits per repo (first-run/demo)")
+                    help="score the most recent N commits, ignoring the saved watermark")
     ap.add_argument("--repo", help="limit to one owner/name")
+    ap.add_argument("--provider", choices=PROVIDERS,
+                    help="limit to one source-code provider")
+    ap.add_argument("--reward", choices=REWARD_TYPES,
+                    help="limit to bounty or disclosure-only programs")
     ap.add_argument("--min-score", type=int, default=3)
+    ap.add_argument("--max-pages", type=int, default=10,
+                    help="maximum 100-commit pages used to reach a saved watermark")
+    ap.add_argument("--list-targets", action="store_true",
+                    help="print every configured target and exit without API calls")
     ap.add_argument("--no-save", action="store_true", help="don't update state")
     args = ap.parse_args()
+    if args.backfill < 0 or args.max_pages < 1:
+        ap.error("--backfill must be >= 0 and --max-pages must be >= 1")
 
     wl = load_json(WATCHLIST, None)
     if wl is None:
         print(f"!! no watchlist at {WATCHLIST}", file=sys.stderr)
-        sys.exit(1)
-    repos = wl["repos"] if isinstance(wl, dict) else wl
-    if args.repo:
-        repos = [r for r in repos if r["repo"] == args.repo]
+        return 2
+    repos = wl.get("repos") if isinstance(wl, dict) else wl
+    config_errors = validate_repos(repos)
+    if config_errors:
+        for error in config_errors:
+            print(f"!! {error}", file=sys.stderr)
+        return 2
 
-    for r in repos:
-        p = r.get("profile")
-        if p and p not in PROFILES:
-            print(f"!! {r['repo']}: unknown profile {p!r}, falling back to "
-                  f"{DEFAULT_PROFILE!r} (valid: {', '.join(PROFILES)})", file=sys.stderr)
+    if args.repo:
+        repos = [entry for entry in repos if entry["repo"] == args.repo]
+        if not repos:
+            print(f"!! configured target not found: {args.repo}", file=sys.stderr)
+            return 2
+    if args.provider:
+        repos = [
+            entry for entry in repos
+            if entry.get("provider", "github") == args.provider
+        ]
+    if args.reward:
+        repos = [
+            entry for entry in repos
+            if entry.get("reward", "vdp") == args.reward
+        ]
+
+    if args.list_targets:
+        for entry in repos:
+            print(
+                f"{target_provider(entry)}\t{entry['repo']}\t"
+                f"{entry.get('profile') or DEFAULT_PROFILE}\t"
+                f"{entry.get('reward', 'vdp')}\t{entry.get('program', '?')}"
+            )
+        print(f"\n{len(repos)} configured target(s)")
+        return 0
 
     state = load_json(STATE, {})
-    all_findings, notes = [], []
+    all_findings, notes, health_errors = [], [], []
+    attempted = 0
+    rate_limited = set()
     for entry in repos:
-        f, note = process_repo(entry, state, args.backfill, args.min_score)
-        all_findings.extend(f)
+        provider = target_provider(entry)
+        label = f"{provider}:{entry['repo']}"
+        if provider in rate_limited:
+            health_errors.append(
+                f"{label}: not attempted after {provider} rate limit"
+            )
+            continue
+        attempted += 1
+        findings, note = process_repo(
+            entry, state, args.backfill, args.min_score, args.max_pages
+        )
+        all_findings.extend(findings)
         if note:
-            notes.append(f"  {entry['repo']}: {note}")
+            notes.append(f"  {label}: {note}")
+        if note_is_error(note):
+            health_errors.append(f"{label}: {note or 'unknown error'}")
         if note == "RATE_LIMIT":
-            print(f"!! GitHub rate limit hit on {entry['repo']} -- watermark HELD; "
-                  f"set GITHUB_TOKEN and re-run.", file=sys.stderr)
-            break
-        if note.startswith("PARTIAL"):
-            # loud, per the no-silent-gaps rule: a commit was NOT scored this run
-            print(f"!! {entry['repo']}: {note}", file=sys.stderr)
+            rate_limited.add(provider)
+            token_name = "GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN"
+            print(
+                f"!! {provider} rate limit hit on {entry['repo']} -- watermark HELD; "
+                f"set {token_name} and re-run.",
+                file=sys.stderr,
+            )
+        if note and note.startswith("PARTIAL"):
+            print(f"!! {label}: {note}", file=sys.stderr)
         time.sleep(0.3)
 
-    # Rank: security-FIX commits first, then by score, then newest within a tie
-    # (two stable sorts: date desc, then the primary key).
-    all_findings.sort(key=lambda x: x.get("date", ""), reverse=True)
-    all_findings.sort(key=lambda x: (-int(bool(x.get("is_fix"))), -x["score"]))
+    kind_priority = {
+        "security_fix": 0,
+        "patch": 1,
+        "new_surface": 2,
+        "review": 3,
+    }
+    all_findings.sort(key=lambda finding: finding.get("date", ""), reverse=True)
+    all_findings.sort(key=lambda finding: (
+        kind_priority.get(finding.get("kind"), 4),
+        -finding["score"],
+    ))
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M")
-    lines = [f"# commit-monitor digest {ts}", ""]
+    lines = [
+        f"# commit-monitor digest {ts}",
+        "",
+        (f"{len(repos)} configured target(s); {attempted} attempted; "
+         f"{len(health_errors)} coverage error(s)."),
+        "",
+    ]
     if all_findings:
-        lines.append(f"{len(all_findings)} security-relevant new commit(s), ranked:\n")
-        for x in all_findings:
-            if x.get("is_fix"):
-                tag = "🔴 SECURITY-FIX → variant-analysis (hunt the un-fixed siblings)"
-            elif x["score"] >= 6:
-                tag = "🟠 risky new code → review the new attack surface"
-            else:
-                tag = "🟡 review"
-            lines.append(f"## [{x['score']}] {tag} — {x['repo']} `{x['sha']}`")
-            lines.append(f"- **{x['subject']}**")
-            lines.append(f"- {x['program']} · {x.get('profile', '?')} · {x['date']} · {x['author']}")
-            lines.append(f"- {x['url']}")
-            for r in x["reasons"]:
-                lines.append(f"  - {r}")
+        lines.append(f"{len(all_findings)} security-relevant commit lead(s), ranked:\n")
+        tags = {
+            "security_fix": "[SECURITY FIX] disclosed-fix variant analysis",
+            "patch": "[PATCH] bug-fix variant review",
+            "new_surface": "[NEW SURFACE] reachability review",
+            "review": "[REVIEW]",
+        }
+        for finding in all_findings:
+            tag = tags.get(finding.get("kind"), tags["review"])
+            label = f"{finding['provider']}:{finding['repo']}"
+            lines.append(
+                f"## [{finding['score']}] {tag} — {label} `{finding['sha']}`"
+            )
+            lines.append(f"- **{finding['subject']}**")
+            lines.append(
+                f"- {finding['program']} · {finding['reward']} · "
+                f"{finding.get('profile', '?')} · {finding['date']} · "
+                f"{finding['author']}"
+            )
+            lines.append(f"- {finding['url']}")
+            for reason in finding["reasons"]:
+                lines.append(f"  - {reason}")
             lines.append("")
     else:
         lines.append("No security-relevant new commits this run.\n")
     if notes:
         lines.append("## Notes")
         lines.extend(notes)
+    if health_errors:
+        lines.append("")
+        lines.append("## Monitor errors")
+        lines.extend(f"- {error}" for error in health_errors)
     digest = "\n".join(lines)
     print(digest)
 
-    if all_findings:
+    if all_findings or health_errors:
         os.makedirs(DIGEST_DIR, exist_ok=True)
         dpath = os.path.join(DIGEST_DIR, f"digest-{ts}.md")
         with open(dpath, "w") as f:
@@ -565,7 +897,8 @@ def main():
 
     if not args.no_save:
         save_json(STATE, state)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

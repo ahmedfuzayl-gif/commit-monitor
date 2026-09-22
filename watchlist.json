@@ -1,153 +1,424 @@
 {
-  "_comment": "PAID + source-code in-scope repos (verified against cached H1 scope data 2026-07-05). Skips smart-contract repos (stablecoin-*/cctp), mobile SDKs, and NO-BOUNTY entries. Each run scores only NEW commits since last-seen SHA. Verify each repo is still in-scope before reporting anything against it.",
-  "_profiles": "Each entry's \"profile\" selects the scoring vocabulary: 'blockchain' (node-client mem-safety / consensus, the default), 'web' (injection/authz/XSS sinks + NEW endpoint/route declarations, so feature commits surface as fresh attack surface even without a security keyword), or 'generic' (union of both, for mixed targets like Electron GUIs). Add web-app targets (e.g. a GitLab-class repo) with profile 'web'.",
+  "_comment": "Active OSS repositories with a public bounty or coordinated vulnerability-disclosure program. reward=bounty means monetary rewards were confirmed; reward=vdp means disclosure-only or reward status was not confirmed. Re-check the linked policy before testing or reporting.",
+  "_schema": "provider: github|gitlab; repo: provider namespace/path; profile: web|systems|desktop|blockchain|generic; reward: bounty|vdp",
   "repos": [
     {
+      "provider": "gitlab",
+      "repo": "gitlab-org/gitlab",
+      "program": "GitLab Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "web",
+      "policy": "https://hackerone.com/gitlab",
+      "policy_checked": "2026-09-22",
+      "notes": "Primary Rails/Vue application; authz, import/export, CI/CD, API, GraphQL"
+    },
+    {
+      "provider": "gitlab",
+      "repo": "gitlab-org/gitaly",
+      "program": "GitLab Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "systems",
+      "policy": "https://hackerone.com/gitlab",
+      "policy_checked": "2026-09-22",
+      "notes": "Git RPC service; repository parsing, command execution, authorization"
+    },
+    {
+      "provider": "gitlab",
+      "repo": "gitlab-org/gitlab-shell",
+      "program": "GitLab Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "systems",
+      "policy": "https://hackerone.com/gitlab",
+      "policy_checked": "2026-09-22",
+      "notes": "SSH entry point and Git command authorization"
+    },
+    {
+      "provider": "gitlab",
+      "repo": "gitlab-org/gitlab-runner",
+      "program": "GitLab Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "generic",
+      "policy": "https://hackerone.com/gitlab",
+      "policy_checked": "2026-09-22",
+      "notes": "CI job execution, artifact handling, isolation, credentials"
+    },
+    {
+      "provider": "gitlab",
+      "repo": "gitlab-org/gitlab-pages",
+      "program": "GitLab Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "systems",
+      "policy": "https://hackerone.com/gitlab",
+      "policy_checked": "2026-09-22",
+      "notes": "User-controlled static content server; routing, proxying, access control"
+    },
+    {
+      "provider": "github",
+      "repo": "WordPress/wordpress-develop",
+      "program": "WordPress Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "web",
+      "policy": "https://hackerone.com/wordpress",
+      "policy_checked": "2026-09-22",
+      "notes": "WordPress core; REST API, uploads, roles, rendering"
+    },
+    {
+      "provider": "github",
+      "repo": "WordPress/gutenberg",
+      "program": "WordPress Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "web",
+      "policy": "https://hackerone.com/wordpress",
+      "policy_checked": "2026-09-22",
+      "notes": "Official block editor; parsing, rendering, permissions, REST endpoints"
+    },
+    {
+      "provider": "github",
+      "repo": "kubernetes/kubernetes",
+      "program": "Kubernetes Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "generic",
+      "policy": "https://hackerone.com/kubernetes",
+      "policy_checked": "2026-09-22",
+      "notes": "API server, kubelet, admission, authorization, networking, storage"
+    },
+    {
+      "provider": "github",
+      "repo": "brave/brave-core",
+      "program": "Brave Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "desktop",
+      "policy": "https://hackerone.com/brave",
+      "policy_checked": "2026-09-22",
+      "notes": "Browser security boundaries, IPC, navigation, extensions, wallet"
+    },
+    {
+      "provider": "github",
+      "repo": "MetaMask/metamask-extension",
+      "program": "MetaMask Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "desktop",
+      "policy": "https://hackerone.com/metamask",
+      "policy_checked": "2026-09-22",
+      "notes": "Wallet extension; origin isolation, permissions, signing, key handling"
+    },
+    {
+      "provider": "github",
+      "repo": "MetaMask/snaps",
+      "program": "MetaMask Bug Bounty",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "desktop",
+      "policy": "https://hackerone.com/metamask",
+      "policy_checked": "2026-09-22",
+      "notes": "Sandboxed wallet extensions; capabilities, RPC, endowments"
+    },
+    {
+      "provider": "github",
+      "repo": "monero-project/monero",
+      "program": "Monero Vulnerability Response",
+      "platform": "hackerone",
+      "reward": "bounty",
+      "profile": "blockchain",
+      "policy": "https://hackerone.com/monero",
+      "policy_checked": "2026-09-22",
+      "notes": "Consensus, wallet, p2p, transaction and cryptographic code"
+    },
+    {
+      "provider": "github",
       "repo": "cosmos/gaia",
-      "program": "Cosmos (H1)",
+      "program": "Cosmos Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "Cosmos Hub node; critical"
+      "policy": "https://hackerone.com/cosmos",
+      "policy_checked": "2026-07-05",
+      "notes": "Cosmos Hub node; consensus and state transitions"
     },
     {
-      "repo": "cosmos/iavl",
-      "program": "Cosmos (H1)",
-      "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "Merkleized IAVL+ tree; state store"
-    },
-    {
+      "provider": "github",
       "repo": "cosmos/evm",
-      "program": "Cosmos (H1)",
+      "program": "Cosmos Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "EVM module; critical"
+      "policy": "https://hackerone.com/cosmos",
+      "policy_checked": "2026-07-05",
+      "notes": "Cosmos EVM module; execution, RPC, state accounting"
     },
     {
-      "repo": "cosmos/ics23",
-      "program": "Cosmos (H1)",
-      "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "proof spec; crypto/verify"
-    },
-    {
+      "provider": "github",
       "repo": "Chia-Network/chia-blockchain",
-      "program": "Chia (H1)",
+      "program": "Chia Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "full node (Python); consensus/p2p"
+      "policy": "https://hackerone.com/chia_network",
+      "policy_checked": "2026-07-05",
+      "notes": "Full node; consensus, wallet, peer protocol"
     },
     {
+      "provider": "github",
       "repo": "Chia-Network/chia_rs",
-      "program": "Chia (H1)",
+      "program": "Chia Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "Rust consensus/crypto core"
+      "policy": "https://hackerone.com/chia_network",
+      "policy_checked": "2026-07-05",
+      "notes": "Rust consensus and cryptographic core"
     },
     {
+      "provider": "github",
       "repo": "Chia-Network/clvm_rs",
-      "program": "Chia (H1)",
+      "program": "Chia Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "CLVM VM in Rust; interpreter"
+      "policy": "https://hackerone.com/chia_network",
+      "policy_checked": "2026-07-05",
+      "notes": "CLVM interpreter; parsing, execution cost, memory safety"
     },
     {
+      "provider": "github",
       "repo": "Chia-Network/chiapos",
-      "program": "Chia (H1)",
+      "program": "Chia Bug Bounty",
       "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "PoSpace C++; parsing/mem-safety"
+      "reward": "bounty",
+      "profile": "systems",
+      "policy": "https://hackerone.com/chia_network",
+      "policy_checked": "2026-07-05",
+      "notes": "Proof-of-space C++; file parsing and memory safety"
     },
     {
-      "repo": "Chia-Network/chiavdf",
-      "program": "Chia (H1)",
+      "provider": "github",
+      "repo": "Chia-Network/chia-blockchain-gui",
+      "program": "Chia Bug Bounty",
       "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "VDF C++; mem-safety"
+      "reward": "bounty",
+      "profile": "desktop",
+      "policy": "https://hackerone.com/chia_network",
+      "policy_checked": "2026-07-05",
+      "notes": "Electron wallet GUI; media, URI, IPC and renderer boundaries"
     },
     {
+      "provider": "github",
       "repo": "circlefin/malachite",
-      "program": "Circle BBP (H1)",
+      "program": "Circle Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "Rust BFT consensus engine; TOP consensus target"
+      "policy": "https://hackerone.com/circle",
+      "policy_checked": "2026-07-05",
+      "notes": "Rust BFT consensus engine"
     },
     {
+      "provider": "github",
       "repo": "circlefin/arc-node",
-      "program": "Circle BBP (H1)",
+      "program": "Circle Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
+      "policy": "https://hackerone.com/circle",
+      "policy_checked": "2026-07-05",
       "notes": "Arc blockchain node"
     },
     {
-      "repo": "circlefin/arc-remote-signer",
-      "program": "Circle BBP (H1)",
-      "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "remote signer; key/crypto handling"
-    },
-    {
+      "provider": "github",
       "repo": "buildonspark/spark",
-      "program": "Lightspark BBP (H1)",
+      "program": "Lightspark Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "Bitcoin/Lightning L2 infra"
+      "policy": "https://hackerone.com/lightspark",
+      "policy_checked": "2026-07-05",
+      "notes": "Bitcoin L2; signing, transfers, consensus and key handling"
     },
     {
-      "repo": "lightsparkdev/lightspark-rs",
-      "program": "Lightspark BBP (H1)",
-      "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "Rust SDK/infra"
-    },
-    {
-      "repo": "lightsparkdev/go-sdk",
-      "program": "Lightspark BBP (H1)",
-      "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "Go SDK/infra"
-    },
-    {
+      "provider": "github",
       "repo": "tronprotocol/java-tron",
-      "program": "TRON DAO (H1)",
+      "program": "TRON DAO Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "TRON full node (Java); consensus/p2p/vm"
+      "policy": "https://hackerone.com/tron_dao",
+      "policy_checked": "2026-07-05",
+      "notes": "TRON full node; consensus, p2p, VM and RPC"
     },
     {
+      "provider": "github",
       "repo": "smartcontractkit/chainlink",
-      "program": "Chainlink (H1)",
+      "program": "Chainlink Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "blockchain",
-      "notes": "oracle node (Go); NOTE resp_eff only ~46%"
+      "policy": "https://hackerone.com/chainlink",
+      "policy_checked": "2026-07-05",
+      "notes": "Oracle node; jobs, bridges, OCR, keys and API"
     },
     {
-      "repo": "lightsparkdev/python-sdk",
-      "program": "Lightspark BBP (H1)",
-      "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "Python SDK/infra"
-    },
-    {
-      "repo": "cosmos/ledger-cosmos",
-      "program": "Cosmos (H1)",
-      "platform": "hackerone",
-      "profile": "blockchain",
-      "notes": "Ledger hardware-wallet app (C); parsing/mem-safety/crypto"
-    },
-    {
+      "provider": "github",
       "repo": "smartcontractkit/external-adapters-js",
-      "program": "Chainlink (H1)",
+      "program": "Chainlink Bug Bounty",
       "platform": "hackerone",
+      "reward": "bounty",
       "profile": "web",
-      "notes": "Node.js external adapters; SSRF/injection/auth (web-app surface)"
+      "policy": "https://hackerone.com/chainlink",
+      "policy_checked": "2026-07-05",
+      "notes": "Node.js adapters; SSRF, parsing, credentials and external APIs"
     },
     {
-      "repo": "Chia-Network/chia-blockchain-gui",
-      "program": "Chia (H1)",
+      "provider": "github",
+      "repo": "discourse/discourse",
+      "program": "Discourse Vulnerability Disclosure",
       "platform": "hackerone",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://hackerone.com/discourse",
+      "policy_checked": "2026-09-22",
+      "notes": "Rails forum; post rendering, plugins, uploads, moderation, authz"
+    },
+    {
+      "provider": "github",
+      "repo": "mattermost/mattermost",
+      "program": "Mattermost Responsible Disclosure",
+      "platform": "direct",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://mattermost.com/security-vulnerability-report/",
+      "policy_checked": "2026-09-22",
+      "notes": "Collaboration platform; plugins, integrations, permissions, files"
+    },
+    {
+      "provider": "github",
+      "repo": "grafana/grafana",
+      "program": "Grafana Labs VDP",
+      "platform": "intigriti",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://github.com/grafana/grafana/security/policy",
+      "policy_checked": "2026-09-22",
+      "notes": "Explicitly disclosure-only; dashboards, data sources, plugins, authz"
+    },
+    {
+      "provider": "github",
+      "repo": "nextcloud/server",
+      "program": "Nextcloud Vulnerability Disclosure",
+      "platform": "hackerone",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://hackerone.com/nextcloud",
+      "policy_checked": "2026-09-22",
+      "notes": "Cloud server; sharing, federation, WebDAV, files, apps"
+    },
+    {
+      "provider": "github",
+      "repo": "RocketChat/Rocket.Chat",
+      "program": "Rocket.Chat VDP",
+      "platform": "hackerone",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://hackerone.com/rocket_chat",
+      "policy_checked": "2026-09-22",
+      "notes": "Policy explicitly offers no monetary rewards"
+    },
+    {
+      "provider": "github",
+      "repo": "OpenVPN/openvpn",
+      "program": "OpenVPN Vulnerability Disclosure",
+      "platform": "direct",
+      "reward": "vdp",
+      "profile": "systems",
+      "policy": "https://openvpn.net/vulnerability-disclosure-policy/",
+      "policy_checked": "2026-09-22",
+      "notes": "VPN daemon; protocol parsing, TLS, privilege and platform code"
+    },
+    {
+      "provider": "github",
+      "repo": "curl/curl",
+      "program": "curl Vulnerability Disclosure",
+      "platform": "hackerone",
+      "reward": "vdp",
+      "profile": "systems",
+      "policy": "https://curl.se/dev/vuln-disclosure.html",
+      "policy_checked": "2026-09-22",
+      "notes": "Policy explicitly offers no bounty; protocol and URL parsing"
+    },
+    {
+      "provider": "github",
+      "repo": "hashicorp/vault",
+      "program": "HashiCorp Vulnerability Disclosure",
+      "platform": "direct",
+      "reward": "vdp",
       "profile": "generic",
-      "notes": "Electron GUI (React/TS); desktop-app + web renderer bug classes"
+      "policy": "https://github.com/hashicorp/vault/security/policy",
+      "policy_checked": "2026-09-22",
+      "notes": "Secrets, auth methods, plugins, policies and storage backends"
+    },
+    {
+      "provider": "github",
+      "repo": "jenkinsci/jenkins",
+      "program": "Jenkins Security Reporting",
+      "platform": "direct",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://www.jenkins.io/security/reporting/",
+      "policy_checked": "2026-09-22",
+      "notes": "Automation server; agents, remoting, plugins, credentials, scripts"
+    },
+    {
+      "provider": "github",
+      "repo": "keycloak/keycloak",
+      "program": "Keycloak Security Reporting",
+      "platform": "direct",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://www.keycloak.org/security",
+      "policy_checked": "2026-09-22",
+      "notes": "Identity provider; OAuth/OIDC/SAML, sessions, realms, admin authz"
+    },
+    {
+      "provider": "github",
+      "repo": "elastic/elasticsearch",
+      "program": "Elastic Security Disclosure",
+      "platform": "hackerone",
+      "reward": "vdp",
+      "profile": "generic",
+      "policy": "https://www.elastic.co/community/security",
+      "policy_checked": "2026-09-22",
+      "notes": "Distributed search; REST APIs, scripting, authz, parsing"
+    },
+    {
+      "provider": "github",
+      "repo": "odoo/odoo",
+      "program": "Odoo Responsible Disclosure",
+      "platform": "direct",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://www.odoo.com/security-report",
+      "policy_checked": "2026-09-22",
+      "notes": "ERP web framework; controllers, record rules, templates, imports"
+    },
+    {
+      "provider": "github",
+      "repo": "PrestaShop/PrestaShop",
+      "program": "PrestaShop Security Disclosure",
+      "platform": "direct",
+      "reward": "vdp",
+      "profile": "web",
+      "policy": "https://www.prestashop-project.org/security/security-policy/",
+      "policy_checked": "2026-09-22",
+      "notes": "Public bounty paused; ecommerce controllers, modules, uploads, admin"
     }
   ]
 }
