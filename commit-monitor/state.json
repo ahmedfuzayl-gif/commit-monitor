@@ -2,7 +2,7 @@
   "cosmos/gaia": {
     "last_sha": "af2da54a88e70c50892e8f5a933a6b94ba6f79af",
     "default_branch_head_seen": "2026-07-05T10:27:56.766186+00:00",
-    "last_checked_at": "2026-09-23T11:47:00.357818+00:00"
+    "last_checked_at": "2026-09-23T17:10:33.009678+00:00"
   },
   "cosmos/iavl": {
     "last_sha": "0b9d3dab675013cef9ddc8a93ed7728caeccbae4",
@@ -11,31 +11,31 @@
   "cosmos/evm": {
     "last_sha": "f387b0395669c53c2c359b5021365ef14c2326da",
     "default_branch_head_seen": "2026-07-05T10:28:10.269401+00:00",
-    "last_checked_at": "2026-09-23T11:47:02.260996+00:00"
+    "last_checked_at": "2026-09-23T17:10:34.109701+00:00"
   },
   "cosmos/ics23": {
     "last_sha": "7f2c2d0965fdcf33658cce3198ddae078a449fc2",
     "default_branch_head_seen": "2026-07-05T10:28:23.248708+00:00"
   },
   "Chia-Network/chia-blockchain": {
-    "last_sha": "7412a57d5ec9ce9cf88428446142a1a1f4436406",
+    "last_sha": "d24cbcb431cc7f83bf2c139241354b48c3dd1452",
     "default_branch_head_seen": "2026-07-05T10:29:27.795584+00:00",
-    "last_checked_at": "2026-09-23T11:47:03.263283+00:00"
+    "last_checked_at": "2026-09-23T17:10:36.689841+00:00"
   },
   "Chia-Network/chia_rs": {
-    "last_sha": "1d1efaaf1e0b4f26f39f820e86b2ee8b94a12487",
+    "last_sha": "7353dbbcb758c4b0082ae48a163dfcc52d581ea7",
     "default_branch_head_seen": "2026-07-05T10:28:43.344748+00:00",
-    "last_checked_at": "2026-09-23T11:47:05.104884+00:00"
+    "last_checked_at": "2026-09-23T17:10:38.611922+00:00"
   },
   "Chia-Network/clvm_rs": {
     "last_sha": "78feb9b2b0f9c2a4742af672d5fd43d55a559b23",
     "default_branch_head_seen": "2026-07-05T10:28:47.327190+00:00",
-    "last_checked_at": "2026-09-23T11:47:05.858306+00:00"
+    "last_checked_at": "2026-09-23T17:10:39.395008+00:00"
   },
   "Chia-Network/chiapos": {
     "last_sha": "2cfbca5e7813ce466b7b9d628f9ab13cb7efe1ff",
     "default_branch_head_seen": "2026-07-05T10:28:53.048290+00:00",
-    "last_checked_at": "2026-09-23T11:47:06.709972+00:00"
+    "last_checked_at": "2026-09-23T17:10:40.385817+00:00"
   },
   "Chia-Network/chiavdf": {
     "last_sha": "9eb6ca1e36b283b2341963a0512d739e302e5dc9",
@@ -44,12 +44,12 @@
   "circlefin/malachite": {
     "last_sha": "72143f6c99a98452b587e1c392bdb80944eb2232",
     "default_branch_head_seen": "2026-07-05T13:17:59.397294+00:00",
-    "last_checked_at": "2026-09-23T11:47:08.441100+00:00"
+    "last_checked_at": "2026-09-23T17:10:42.475046+00:00"
   },
   "circlefin/arc-node": {
     "last_sha": "2a3e8ab10c0ac97bf1a2628a325eb98d4a468b1a",
     "default_branch_head_seen": "2026-07-05T13:18:03.095988+00:00",
-    "last_checked_at": "2026-09-23T11:47:09.275904+00:00"
+    "last_checked_at": "2026-09-23T17:10:43.357321+00:00"
   },
   "circlefin/arc-remote-signer": {
     "last_sha": "a9e9fdb48c1e96a6c3fb875aba3d341e6a8af1a6",
@@ -58,7 +58,7 @@
   "buildonspark/spark": {
     "last_sha": "0b3a32a05c9ac06cc411683551dd1f1bde9d0caa",
     "default_branch_head_seen": "2026-07-05T13:18:09.341566+00:00",
-    "last_checked_at": "2026-09-23T11:47:10.401850+00:00"
+    "last_checked_at": "2026-09-23T17:10:44.385353+00:00"
   },
   "lightsparkdev/lightspark-rs": {
     "last_sha": "fcb31f8580e9435e6114fac3ab56117aa3658556",
@@ -71,12 +71,12 @@
   "tronprotocol/java-tron": {
     "last_sha": "b33eed89a6a424c498d4fb1b03ca2c86eddf4840",
     "default_branch_head_seen": "2026-07-05T13:18:22.859408+00:00",
-    "last_checked_at": "2026-09-23T11:47:11.234477+00:00"
+    "last_checked_at": "2026-09-23T17:10:45.241608+00:00"
   },
   "smartcontractkit/chainlink": {
-    "last_sha": "9028f99a360f00f4e52b967e7f2198d8c97b8181",
+    "last_sha": "2ae9bf0562a1febb3771dfeece9e3d1ac18768f1",
     "default_branch_head_seen": "2026-07-05T13:18:27.245336+00:00",
-    "last_checked_at": "2026-09-23T11:47:12.068725+00:00"
+    "last_checked_at": "2026-09-23T17:10:48.973062+00:00"
   },
   "lightsparkdev/python-sdk": {
     "last_sha": "26e11578308a8a57e5eb5e46b88c2a458f7cccd0",
@@ -87,74 +87,74 @@
     "default_branch_head_seen": "2026-07-12T12:01:59.214789+00:00"
   },
   "smartcontractkit/external-adapters-js": {
-    "last_sha": "704e78bce26372aecfa6468583802ae344538df5",
+    "last_sha": "0681a2da8a95b07b22e84e8d25532fd430da4456",
     "default_branch_head_seen": "2026-07-12T12:02:00.599836+00:00",
-    "last_checked_at": "2026-09-23T11:47:13.074777+00:00"
+    "last_checked_at": "2026-09-23T17:10:50.380788+00:00"
   },
   "Chia-Network/chia-blockchain-gui": {
     "last_sha": "9e205bbe7e3f66c334a924f98fcf91f2c20d9bff",
     "default_branch_head_seen": "2026-07-12T12:02:02.027285+00:00",
-    "last_checked_at": "2026-09-23T11:47:07.494982+00:00"
+    "last_checked_at": "2026-09-23T17:10:41.328364+00:00"
   },
   "gitlab:gitlab-org/gitlab": {
-    "last_sha": "c8f4a898692aac83fbab0e1dcf90b398d3770db1",
-    "last_checked_at": "2026-09-23T11:46:13.702144+00:00"
+    "last_sha": "4b8e770e1b1deb0ab58f63e8b9a3a86ff60c8538",
+    "last_checked_at": "2026-09-23T17:09:52.673719+00:00"
   },
   "gitlab:gitlab-org/gitaly": {
     "last_sha": "e1e1d97677763943f03fe5deb31b064432e31ae9",
-    "last_checked_at": "2026-09-23T11:46:14.290210+00:00"
+    "last_checked_at": "2026-09-23T17:09:53.222933+00:00"
   },
   "gitlab:gitlab-org/gitlab-shell": {
     "last_sha": "2b5ea4fd8539f822064d5c1c534a561b39d8e010",
-    "last_checked_at": "2026-09-23T11:46:17.019388+00:00"
+    "last_checked_at": "2026-09-23T17:09:53.856876+00:00"
   },
   "gitlab:gitlab-org/gitlab-runner": {
-    "last_sha": "01b61ff59616d8d2d974c36a30ef53641c562cdd",
-    "last_checked_at": "2026-09-23T11:46:18.547163+00:00"
+    "last_sha": "49138a48b894f517d2ebe77dda89929d1f7f9550",
+    "last_checked_at": "2026-09-23T17:09:58.301979+00:00"
   },
   "gitlab:gitlab-org/gitlab-pages": {
     "last_sha": "2a00ded8f8579c32aed2b5c801d37cf66276855d",
-    "last_checked_at": "2026-09-23T11:46:19.106365+00:00"
+    "last_checked_at": "2026-09-23T17:09:58.853101+00:00"
   },
   "WordPress/wordpress-develop": {
-    "last_sha": "f4c1a30e4724f6cf6da034276aa3a8835469f340",
-    "last_checked_at": "2026-09-23T11:46:20.847699+00:00"
+    "last_sha": "9ae59516ef7ff22552fc86a7769d8e2e1ae4b2b0",
+    "last_checked_at": "2026-09-23T17:10:01.115543+00:00"
   },
   "WordPress/gutenberg": {
-    "last_sha": "c81928710ee5ed9dfac1efa69c68ee40deacacc8",
-    "last_checked_at": "2026-09-23T11:46:43.316567+00:00"
+    "last_sha": "eb1112b697874951b53b3b68122afa359946a40c",
+    "last_checked_at": "2026-09-23T17:10:06.332969+00:00"
   },
   "kubernetes/kubernetes": {
-    "last_sha": "877e7690935292fccee581dc08357d0721512768",
-    "last_checked_at": "2026-09-23T11:46:47.095253+00:00"
+    "last_sha": "ac1e38e7f2d5dab896342e83a4e82bef32dc87c6",
+    "last_checked_at": "2026-09-23T17:10:11.180447+00:00"
   },
   "brave/brave-core": {
-    "last_sha": "f438dc3a66d63b9cc11c0c2a262b44ac248e175d",
-    "last_checked_at": "2026-09-23T11:46:50.168599+00:00"
+    "last_sha": "a0c1bb90738e6be369b923469b49c1f350cecf9e",
+    "last_checked_at": "2026-09-23T17:10:19.579620+00:00"
   },
   "MetaMask/metamask-extension": {
-    "last_sha": "ad32a8c0085aa9bb33fb57b9f52a311f0eb8ef8d",
-    "last_checked_at": "2026-09-23T11:46:53.533479+00:00"
+    "last_sha": "06a6bfec660e4bb1a4fc018c0e462efe876c11c8",
+    "last_checked_at": "2026-09-23T17:10:26.645045+00:00"
   },
   "MetaMask/snaps": {
     "last_sha": "f42b5629b262e5ea267a6e02ac9aa873a5f261d5",
-    "last_checked_at": "2026-09-23T11:46:55.136197+00:00"
+    "last_checked_at": "2026-09-23T17:10:28.186511+00:00"
   },
   "monero-project/monero": {
-    "last_sha": "834923958d975ce2d7e824fc22acb96533714cc5",
-    "last_checked_at": "2026-09-23T11:46:59.478459+00:00"
+    "last_sha": "d02c7c57a7b9e9ce0eead684a48345c6f48fea81",
+    "last_checked_at": "2026-09-23T17:10:31.947254+00:00"
   },
   "discourse/discourse": {
-    "last_sha": "888124f3b315122eb63816dd6c50188728d0150b",
-    "last_checked_at": "2026-09-23T11:47:17.095158+00:00"
+    "last_sha": "875b2a384d17fb3d09f5ffc4cdd22c49a7b6607d",
+    "last_checked_at": "2026-09-23T17:10:54.617799+00:00"
   },
   "mattermost/mattermost": {
-    "last_sha": "da316ef0acb96f728f20014f2bb4886c06ba28c6",
-    "last_checked_at": "2026-09-23T11:47:20.076486+00:00"
+    "last_sha": "be1bfe55a3aee7fc114323844e4b29e3b0aab6cb",
+    "last_checked_at": "2026-09-23T17:10:58.895609+00:00"
   },
   "grafana/grafana": {
-    "last_sha": "71912de03ab44228a2d49a993a2105df2763385e",
-    "last_checked_at": "2026-09-23T11:47:31.505187+00:00"
+    "last_sha": "1614865a1b27ca81c04a3468b9728df877660e8c",
+    "last_checked_at": "2026-09-23T17:11:21.299652+00:00"
   },
   "nextcloud/server": {
     "last_sha": "7833a2962afdaf9288dbb844cad04aaa6f23d6cc",
@@ -162,38 +162,38 @@
   },
   "RocketChat/Rocket.Chat": {
     "last_sha": "182dd0b2ec1ae582ab22cef928000712ecf8d664",
-    "last_checked_at": "2026-09-23T11:47:43.748327+00:00"
+    "last_checked_at": "2026-09-23T17:11:42.047771+00:00"
   },
   "OpenVPN/openvpn": {
     "last_sha": "0cc99b10b4464bdeaa8c254f8388aeb241e8e8b6",
-    "last_checked_at": "2026-09-23T11:47:44.540448+00:00"
+    "last_checked_at": "2026-09-23T17:11:42.920878+00:00"
   },
   "curl/curl": {
-    "last_sha": "8807773c6af3106dbadb2aad5a2dc9488a3ac8d0",
-    "last_checked_at": "2026-09-23T11:47:46.379922+00:00"
+    "last_sha": "636dab5daf1618a385ed87436a2524f776d0edfb",
+    "last_checked_at": "2026-09-23T17:11:46.418341+00:00"
   },
   "hashicorp/vault": {
-    "last_sha": "455c710808f09580def126e2372f265f535c073a",
-    "last_checked_at": "2026-09-23T11:47:48.295309+00:00"
+    "last_sha": "3e0a6432b3dcfc3235e3a6761716060acb23785e",
+    "last_checked_at": "2026-09-23T17:11:53.037564+00:00"
   },
   "jenkinsci/jenkins": {
     "last_sha": "1a82aaca995337a726818f99b81f5c274247ae6e",
-    "last_checked_at": "2026-09-23T11:47:50.087117+00:00"
+    "last_checked_at": "2026-09-23T17:11:54.017947+00:00"
   },
   "keycloak/keycloak": {
-    "last_sha": "2ad48ee078653daa8f0724f1aedee793735d9990",
-    "last_checked_at": "2026-09-23T11:48:10.059323+00:00"
+    "last_sha": "19521970a659afc72e4d9709cfbe235273adcdc3",
+    "last_checked_at": "2026-09-23T17:11:59.482643+00:00"
   },
   "elastic/elasticsearch": {
-    "last_sha": "69640d21cddbb3bc7588c9b17c96dd84c88ba1c8",
-    "last_checked_at": "2026-09-23T11:48:23.562760+00:00"
+    "last_sha": "70de3c6135f7a7557b72ce7c4026bb7072eb1c03",
+    "last_checked_at": "2026-09-23T17:12:12.894063+00:00"
   },
   "odoo/odoo": {
-    "last_sha": "61820b37b6ed039868060717e93b89c74bcf5a09",
-    "last_checked_at": "2026-09-23T11:48:25.912189+00:00"
+    "last_sha": "d0a05578cb32d84d1670bd7fbd01106df0bc5d89",
+    "last_checked_at": "2026-09-23T17:12:21.155928+00:00"
   },
   "PrestaShop/PrestaShop": {
-    "last_sha": "1f83d7b44599752beb2762498bc8cafb7ed3476a",
-    "last_checked_at": "2026-09-23T11:48:26.823394+00:00"
+    "last_sha": "158ff051e629adbac04863e289bfb41ad40d5abc",
+    "last_checked_at": "2026-09-23T17:12:22.660167+00:00"
   }
 }
